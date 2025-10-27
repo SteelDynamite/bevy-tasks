@@ -109,12 +109,14 @@ TaskList {
 }
 
 AppConfig {
-    storage_type: StorageType,  // Local or WebDAV
-    local_path: Option<PathBuf>,
-    webdav_url: Option<String>,
+    // Stored in platform-specific config location
+    local_path: PathBuf,             // User-selected tasks folder (required)
+    webdav_url: Option<String>,      // Optional WebDAV server
     webdav_credentials: Option<Credentials>,
     theme: Theme,
     last_sync: Option<DateTime>,
+    window_size: Option<(u32, u32)>,
+    last_opened_list: Option<Uuid>,
 }
 ```
 
@@ -197,8 +199,8 @@ pub struct TaskRepository {
 }
 
 impl TaskRepository {
-    pub fn new(config: Config) -> Result<Self>;
-    pub fn init(path: PathBuf) -> Result<Self>;
+    pub fn new(tasks_folder: PathBuf) -> Result<Self>;
+    pub fn init(tasks_folder: PathBuf) -> Result<Self>;
 
     // Task operations
     pub fn create_task(&mut self, list_id: Uuid, task: Task) -> Result<Task>;
@@ -229,19 +231,23 @@ pub trait Storage {
 ### Storage Strategy
 
 #### Local Storage
-- **Location**: User-selectable folder OR platform-specific app data directory
-  - Windows: `%APPDATA%/bevy-tasks/` (default)
-  - Linux: `~/.local/share/bevy-tasks/` (default)
-  - macOS: `~/Library/Application Support/bevy-tasks/` (default)
-  - iOS: App sandbox documents directory
-  - Android: Internal storage app directory
-  - User can select any folder with read/write permissions
+- **Location**: **User must select a folder** on first run
+  - Can be anywhere with read/write permissions
+  - Examples: `~/Documents/Tasks`, `~/Dropbox/Tasks`, `D:\My Tasks`
+  - Users can change location later in settings
+  - **No hidden default directories** - full user control and visibility
+- **App Configuration Storage** (separate from task data):
+  - Windows: `%APPDATA%/bevy-tasks/config.json`
+  - Linux: `~/.config/bevy-tasks/config.json`
+  - macOS: `~/Library/Application Support/bevy-tasks/config.json`
+  - iOS: App sandbox preferences
+  - Android: App preferences
+  - Stores: selected folder path, theme, last sync time, window position
 - **Format**: Markdown files with YAML frontmatter (Obsidian-compatible)
 - **Structure**:
   ```
-  data/
+  ~/Documents/Tasks/           # User-selected folder
   ├── .bevy-tasks/
-  │   ├── config.json          # App configuration
   │   └── metadata.json        # List ordering, sync state
   ├── My Tasks/                # Task list folder
   │   ├── Buy groceries.md
@@ -253,13 +259,20 @@ pub trait Storage {
       └── Team meeting prep.md
   ```
 
-**Benefits of Markdown Format**:
-- Human-readable and editable in any text editor
-- Compatible with Obsidian, Logseq, and other markdown tools
-- Easy to version control (git-friendly)
-- Future-proof format
-- Enables external editing and scripting
-- Natural organization with folders
+**First Run Experience**:
+- CLI: `bevy-tasks init ~/Documents/Tasks` (user specifies path)
+- GUI: Folder picker dialog on first launch
+- Mobile: Folder picker with suggested locations (Documents, iCloud Drive, etc.)
+
+**Benefits of User-Selected Storage**:
+- **Full transparency**: Users can see exactly where their data is
+- **Easy backup**: Users can backup the folder however they want (Time Machine, cloud sync, etc.)
+- **Portable**: Move folder between machines, cloud drives, USB drives
+- **No lock-in**: Data is in plain markdown, accessible without the app
+- **Git-friendly**: Users can version control their tasks folder
+- **Compatible with other tools**: Use with Obsidian, Logseq, VS Code, etc.
+- **Multiple vaults**: Users can have separate task folders for work/personal
+- **User choice**: Dropbox, iCloud, OneDrive, local folder - user decides
 
 #### WebDAV Sync
 - **Conflict Resolution**: Last-write-wins with timestamp
@@ -317,10 +330,19 @@ pub trait Storage {
 
 **CLI Example**:
 ```bash
-bevy-tasks init ~/my-tasks
+# First run: initialize tasks folder
+bevy-tasks init ~/Documents/Tasks
+
+# Or use a cloud-synced folder
+bevy-tasks init ~/Dropbox/Tasks
+
+# Then use normally
 bevy-tasks add "Buy groceries" --list "Personal"
 bevy-tasks list
 bevy-tasks complete <task-id>
+
+# Change folder location
+bevy-tasks config set-folder ~/new/location
 ```
 
 ### Phase 2: WebDAV Sync (Backend + CLI)
@@ -358,7 +380,7 @@ bevy-tasks sync --status
 - [ ] Basic task list view
 - [ ] Create/edit/delete tasks
 - [ ] Mark tasks complete
-- [ ] Settings screen (storage location, WebDAV config)
+- [ ] Settings screen (change folder location, WebDAV config)
 - [ ] Desktop support (Windows, Linux, macOS)
 - [ ] Sync status indicators
 
@@ -379,7 +401,7 @@ bevy-tasks sync --status
 - [ ] Rich markdown editor for task notes
 - [ ] Drag & drop reordering
 - [ ] Move tasks between lists
-- [ ] Folder picker for custom storage
+- [ ] Change storage folder location in settings
 - [ ] Keyboard shortcuts
 - [ ] Search functionality
 
@@ -679,7 +701,7 @@ cargo test --watch  # with cargo-watch
 2. **Build CLI to test backend**:
 ```bash
 cd crates/bevy-tasks-cli
-cargo run -- init ~/my-tasks
+cargo run -- init ~/Documents/TestTasks
 cargo run -- add "Test task"
 cargo run -- list
 ```
@@ -824,5 +846,5 @@ To be determined.
 ---
 
 **Last Updated**: 2025-10-27
-**Document Version**: 2.1
-**Status**: Ready to Implement - egui Hybrid Approach Confirmed
+**Document Version**: 2.2
+**Status**: Ready to Implement - User-Controlled Storage
