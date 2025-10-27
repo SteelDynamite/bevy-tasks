@@ -19,29 +19,44 @@ A local-first, cross-platform tasks application inspired by Google Tasks, built 
 
 ## Technology Stack
 
-### Core Framework
-- **Bevy 0.16+**: Game engine providing cross-platform rendering and ECS architecture
-- **bevy_ui**: For immediate UI components
-- **bevy_egui**: Optional for more complex UI widgets (if needed)
+### Project Structure: Workspace with Backend/Frontend Separation
 
-### Data Storage Layer
+The project is organized as a Cargo workspace with three main crates:
+
+1. **bevy-tasks-core** (Library): Pure Rust business logic, no UI dependencies
+2. **bevy-tasks-cli** (Binary): Command-line interface for power users and testing
+3. **bevy-tasks-gui** (Binary): Graphical frontend (framework TBD - see Frontend Comparison)
+
+This separation provides:
+- Clean architecture with testable core logic
+- Multiple interfaces to the same backend
+- Ability to develop and validate backend before frontend work
+- CLI tool useful for automation, scripting, and CI/CD
+
+### Backend/Core Library
 - **serde**: Serialization/deserialization
 - **pulldown-cmark** or **markdown**: Markdown parsing
-- **gray_matter** or **yaml-rust**: YAML frontmatter parsing (Obsidian-style metadata)
+- **serde_yaml**: YAML frontmatter parsing (Obsidian-style metadata)
 - **directories**: Cross-platform path handling
 - **tokio**: Async runtime for I/O operations
 - **reqwest** + **dav-client**: WebDAV support
+- **uuid**: Unique identifiers for tasks
+- **chrono**: Date/time handling
+- **anyhow**: Error handling
 
-### Mobile Platform Support
-- **bevy_mobile_example**: Reference for iOS/Android builds
-- **cargo-apk**: Android builds
-- **xcode**: iOS builds
+### CLI Frontend
+- **clap**: Command-line argument parsing
+- **colored**: Terminal colors for better UX
+- **indicatif**: Progress bars for sync operations
+
+### GUI Frontend
+See "Frontend Framework Comparison" section below for detailed options.
 
 ### Performance Optimization
 - **Lazy loading**: Load only visible data
-- **Asset preprocessing**: Minimize runtime overhead
 - **Minimal dependencies**: Keep binary size small
 - **Release optimizations**: LTO, strip symbols
+- **Backend separation**: Core logic has zero UI overhead
 
 ## Architecture
 
@@ -103,44 +118,112 @@ AppConfig {
 }
 ```
 
-### Module Structure
+### Workspace Structure
 
 ```
 bevy-tasks/
-├── src/
-│   ├── main.rs              # Entry point
-│   ├── app.rs               # Bevy app setup
-│   ├── data/
-│   │   ├── mod.rs
-│   │   ├── models.rs        # Task, TaskList, AppConfig
-│   │   ├── repository.rs    # Data access abstraction
-│   │   └── storage/
-│   │       ├── mod.rs
-│   │       ├── local.rs     # Local file storage
-│   │       └── webdav.rs    # WebDAV client
-│   ├── ui/
-│   │   ├── mod.rs
-│   │   ├── screens/
-│   │   │   ├── task_list.rs
-│   │   │   ├── task_detail.rs
-│   │   │   └── settings.rs
-│   │   └── components/
-│   │       ├── task_item.rs
-│   │       ├── task_input.rs
-│   │       └── list_selector.rs
-│   ├── systems/
-│   │   ├── mod.rs
-│   │   ├── input.rs         # Input handling
-│   │   ├── sync.rs          # Background sync
-│   │   └── navigation.rs    # Screen navigation
-│   └── resources/
-│       ├── mod.rs
-│       └── app_state.rs     # Global state management
-├── assets/
-│   ├── fonts/
-│   └── icons/
-├── Cargo.toml
-└── PLAN.md
+├── Cargo.toml                    # Workspace definition
+├── PLAN.md
+├── README.md
+│
+├── crates/
+│   ├── bevy-tasks-core/          # Core library (backend)
+│   │   ├── Cargo.toml
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── task.rs           # Task model
+│   │   │   ├── task_list.rs      # TaskList model
+│   │   │   ├── config.rs         # AppConfig
+│   │   │   ├── repository.rs     # High-level API
+│   │   │   ├── storage/
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── local.rs      # Local file I/O
+│   │   │   │   ├── markdown.rs   # Markdown parser
+│   │   │   │   └── webdav.rs     # WebDAV sync
+│   │   │   └── error.rs          # Error types
+│   │   └── tests/
+│   │       ├── integration.rs
+│   │       └── fixtures/
+│   │
+│   ├── bevy-tasks-cli/           # CLI frontend
+│   │   ├── Cargo.toml
+│   │   ├── src/
+│   │   │   ├── main.rs
+│   │   │   ├── commands/
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── add.rs
+│   │   │   │   ├── list.rs
+│   │   │   │   ├── complete.rs
+│   │   │   │   ├── sync.rs
+│   │   │   │   └── init.rs
+│   │   │   └── ui.rs             # Terminal formatting
+│   │   └── README.md
+│   │
+│   └── bevy-tasks-gui/           # GUI frontend
+│       ├── Cargo.toml
+│       ├── src/
+│       │   ├── main.rs           # App entry point
+│       │   ├── app.rs            # Framework setup
+│       │   ├── ui/
+│       │   │   ├── mod.rs
+│       │   │   ├── screens/
+│       │   │   │   ├── task_list.rs
+│       │   │   │   ├── task_detail.rs
+│       │   │   │   └── settings.rs
+│       │   │   └── components/
+│       │   │       ├── task_item.rs
+│       │   │       ├── task_input.rs
+│       │   │       └── list_selector.rs
+│       │   └── state.rs          # UI state management
+│       ├── assets/
+│       │   ├── fonts/
+│       │   └── icons/
+│       └── README.md
+│
+└── docs/
+    ├── API.md
+    ├── CLI.md
+    └── DEVELOPMENT.md
+```
+
+### Core Library API Design
+
+The `bevy-tasks-core` library will expose a clean, high-level API:
+
+```rust
+// Main repository interface
+pub struct TaskRepository {
+    storage: Box<dyn Storage>,
+}
+
+impl TaskRepository {
+    pub fn new(config: Config) -> Result<Self>;
+    pub fn init(path: PathBuf) -> Result<Self>;
+
+    // Task operations
+    pub fn create_task(&mut self, list_id: Uuid, task: Task) -> Result<Task>;
+    pub fn get_task(&self, id: Uuid) -> Result<Task>;
+    pub fn update_task(&mut self, task: Task) -> Result<()>;
+    pub fn delete_task(&mut self, id: Uuid) -> Result<()>;
+    pub fn list_tasks(&self, list_id: Uuid) -> Result<Vec<Task>>;
+
+    // List operations
+    pub fn create_list(&mut self, name: String) -> Result<TaskList>;
+    pub fn get_lists(&self) -> Result<Vec<TaskList>>;
+    pub fn delete_list(&mut self, id: Uuid) -> Result<()>;
+
+    // Sync operations
+    pub fn sync_push(&mut self) -> Result<SyncResult>;
+    pub fn sync_pull(&mut self) -> Result<SyncResult>;
+    pub fn sync_status(&self) -> Result<SyncStatus>;
+}
+
+// Storage trait for local and WebDAV implementations
+pub trait Storage {
+    fn read_task(&self, list_id: Uuid, task_id: Uuid) -> Result<Task>;
+    fn write_task(&mut self, list_id: Uuid, task: &Task) -> Result<()>;
+    // ... more methods
+}
 ```
 
 ### Storage Strategy
@@ -210,60 +293,99 @@ bevy-tasks/
 
 ## Feature Roadmap
 
-### Phase 1: MVP
-**Goal**: Basic local-first tasks app on desktop platforms
+### Phase 1: Core Library & CLI MVP
+**Goal**: Build and validate the backend with a functional CLI
 
 **Features**:
-- [ ] Single task list
-- [ ] Create, read, update, delete tasks
-- [ ] Mark tasks as complete/incomplete
-- [ ] Local file storage (Markdown files)
-- [ ] Markdown parsing with YAML frontmatter
-- [ ] Basic UI (list view)
-- [ ] Desktop support (Windows, Linux, macOS)
+- [ ] Project workspace setup (bevy-tasks-core, bevy-tasks-cli, bevy-tasks-gui)
+- [ ] Data models (Task, TaskList, AppConfig)
+- [ ] Markdown file I/O with YAML frontmatter parsing
+- [ ] Local storage implementation
+- [ ] Repository pattern and public API
+- [ ] CLI: init, add, list, complete, delete, edit commands
+- [ ] CLI: Basic task listing and formatting
+- [ ] Comprehensive unit and integration tests
 
 **Deliverables**:
-- Functional desktop app
-- Data persists across sessions as .md files
-- Sub-second startup time
+- `bevy-tasks-core` library with stable API
+- Functional CLI that can manage tasks via command line
+- Data persists as Obsidian-compatible .md files
+- Well-tested backend (>80% coverage)
 
-### Phase 2: Multiple Lists & Organization
-**Goal**: Feature parity with basic Google Tasks functionality
+**CLI Example**:
+```bash
+bevy-tasks init ~/my-tasks
+bevy-tasks add "Buy groceries" --list "Personal"
+bevy-tasks list
+bevy-tasks complete <task-id>
+```
+
+### Phase 2: WebDAV Sync (Backend + CLI)
+**Goal**: Enable cross-device synchronization via CLI
+
+**Features**:
+- [ ] WebDAV client implementation in core library
+- [ ] Credential storage (platform keychain)
+- [ ] Bi-directional sync (push/pull/auto)
+- [ ] Conflict resolution (last-write-wins)
+- [ ] Offline queue for pending operations
+- [ ] CLI: sync setup, push, pull, status commands
+- [ ] CLI: Progress indicators for sync operations
+
+**Deliverables**:
+- Working WebDAV sync in backend
+- CLI can sync with remote WebDAV server
+- Reliable conflict resolution tested with real servers (Nextcloud, ownCloud)
+
+**CLI Example**:
+```bash
+bevy-tasks sync --setup
+bevy-tasks sync --push
+bevy-tasks sync --pull
+bevy-tasks sync --status
+```
+
+### Phase 3: GUI MVP (Desktop)
+**Goal**: Build graphical interface on desktop platforms
+
+**Frontend Decision**: Choose frontend framework (see Frontend Comparison section)
+
+**Features**:
+- [ ] GUI framework integration
+- [ ] Basic task list view
+- [ ] Create/edit/delete tasks
+- [ ] Mark tasks complete
+- [ ] Settings screen (storage location, WebDAV config)
+- [ ] Desktop support (Windows, Linux, macOS)
+- [ ] Sync status indicators
+
+**Deliverables**:
+- Functional desktop GUI app
+- Sub-second startup time
+- Clean, minimal UI
+- Feature parity with CLI
+
+### Phase 4: GUI Advanced Features (Desktop)
+**Goal**: Feature parity with Google Tasks
 
 **Features**:
 - [ ] Multiple task lists (folders)
 - [ ] Switch between lists
-- [ ] Subtasks support (nested folders or parent_id)
-- [ ] Due dates (frontmatter metadata)
-- [ ] Task notes/descriptions (markdown content)
-- [ ] Reorder tasks (drag & drop, updates position)
-- [ ] Move tasks between lists (move .md files)
-- [ ] Folder picker for custom storage location
+- [ ] Subtasks support
+- [ ] Due dates with date picker
+- [ ] Rich markdown editor for task notes
+- [ ] Drag & drop reordering
+- [ ] Move tasks between lists
+- [ ] Folder picker for custom storage
+- [ ] Keyboard shortcuts
+- [ ] Search functionality
 
 **Deliverables**:
-- Full task management functionality
-- Improved UI/UX
-- Obsidian-compatible file format
+- Full-featured desktop task manager
+- Polished UX
+- Keyboard-driven workflow
 
-### Phase 3: WebDAV Sync
-**Goal**: Enable cross-device synchronization
-
-**Features**:
-- [ ] WebDAV client implementation
-- [ ] Settings screen for storage configuration
-- [ ] Credential storage (see Authentication section)
-- [ ] Sync status indicators
-- [ ] Conflict resolution (last-write-wins with manual review option)
-- [ ] Offline mode with queue
-- [ ] Manual sync trigger
-- [ ] Bi-directional sync of .md files
-
-**Deliverables**:
-- Working WebDAV sync
-- Reliable conflict resolution
-- Seamless offline/online transitions
-
-### Phase 4: Mobile Support
+### Phase 5: Mobile Support
 **Goal**: Deploy to iOS and Android
 
 **Features**:
@@ -274,27 +396,27 @@ bevy-tasks/
 - [ ] Background sync on mobile
 - [ ] Mobile file system integration
 - [ ] Share extension (share to tasks)
+- [ ] Native mobile feel
 
 **Deliverables**:
 - Working iOS app
 - Working Android app
 - Consistent UX across mobile and desktop
 
-### Phase 5: Polish & Advanced Features
-**Goal**: Differentiate from Google Tasks, leverage Bevy's capabilities
+### Phase 6: Polish & Advanced Features
+**Goal**: Differentiate from Google Tasks, add unique features
 
 **Features**:
 - [ ] Themes and customization
-- [ ] Advanced animations and transitions
-- [ ] Keyboard shortcuts
+- [ ] Advanced animations and transitions (if using Bevy)
 - [ ] Full-text search across tasks
 - [ ] Filters and smart lists
 - [ ] Task templates
 - [ ] Recurring tasks
 - [ ] Statistics and insights
-- [ ] Game-like achievement system (optional)
-- [ ] Custom UI skins
-- [ ] Plugin system for extensions
+- [ ] Export/import (backup)
+- [ ] Plugin system for extensions (optional)
+- [ ] Game-like achievements (optional, if using Bevy)
 
 **Deliverables**:
 - Polished, delightful UX
@@ -376,28 +498,373 @@ bevy-tasks/
 - Users handle their own backups (external to app)
 - Migration can be done in-place by updating frontmatter
 
+## Frontend Framework Comparison
+
+Now that we have backend/frontend separation, we can evaluate multiple GUI framework options. The backend (`bevy-tasks-core`) is framework-agnostic.
+
+### Option 1: Bevy (Game Engine)
+**Language**: Rust
+**Architecture**: ECS (Entity Component System)
+
+**Pros**:
+- ✅ True cross-platform (Windows, Linux, macOS, iOS, Android, WASM)
+- ✅ Excellent performance (60+ FPS easily)
+- ✅ Future game-like polish and animations
+- ✅ Active community and development
+- ✅ Full control over rendering
+- ✅ Single codebase for all platforms
+- ✅ Fast startup possible with `MinimalPlugins`
+
+**Cons**:
+- ❌ UI system is still maturing (bevy_ui improving but limited)
+- ❌ More code required for standard widgets
+- ❌ Steeper learning curve (ECS paradigm)
+- ❌ Larger binary size (~5-10MB stripped)
+- ❌ Text input handling requires extra work
+- ❌ Not designed for traditional UIs
+
+**Best for**: If you want game-like polish, animations, and are willing to build custom UI components.
+
+**Startup time estimate**: 200-500ms
+**Binary size**: 5-10MB (stripped)
+
+---
+
+### Option 2: egui (Immediate Mode GUI)
+**Language**: Rust
+**Integration**: Standalone or with eframe
+
+**Pros**:
+- ✅ True cross-platform (desktop, WASM, can run on mobile)
+- ✅ Very simple API (immediate mode)
+- ✅ Rich built-in widgets
+- ✅ Excellent text editing support
+- ✅ Small binary size (~2-3MB)
+- ✅ Fast development iteration
+- ✅ Mature and stable
+- ✅ Good performance
+- ✅ Works with multiple backends (glow, wgpu)
+
+**Cons**:
+- ❌ Mobile support exists but less mature
+- ❌ Immediate mode can be unusual coming from retained mode
+- ❌ Less flexibility for custom animations
+- ❌ Harder to achieve "game-like" polish
+- ❌ Less native feel on each platform
+
+**Best for**: Quick development, standard UI needs, if you don't need game-like features.
+
+**Startup time estimate**: 100-200ms
+**Binary size**: 2-3MB (stripped)
+
+---
+
+### Option 3: Iced (Elm-inspired)
+**Language**: Rust
+**Architecture**: The Elm Architecture (TEA)
+
+**Pros**:
+- ✅ Cross-platform (Windows, Linux, macOS, WASM)
+- ✅ Declarative, reactive UI (similar to SwiftUI/Flutter)
+- ✅ Clean architecture with clear state management
+- ✅ Type-safe
+- ✅ Good widget library
+- ✅ Native-feeling widgets
+- ✅ Async support built-in
+- ✅ Medium binary size (~3-5MB)
+
+**Cons**:
+- ❌ Mobile support experimental (iOS/Android not production-ready)
+- ❌ Smaller community than egui or Bevy
+- ❌ Still evolving (breaking changes possible)
+- ❌ Limited animation capabilities
+- ❌ Less documentation than mature frameworks
+
+**Best for**: If you like reactive/declarative UIs and primarily target desktop + WASM.
+
+**Startup time estimate**: 150-300ms
+**Binary size**: 3-5MB (stripped)
+
+---
+
+### Option 4: Dioxus (React-like)
+**Language**: Rust
+**Architecture**: Virtual DOM with React-like hooks
+
+**Pros**:
+- ✅ Cross-platform (desktop, web, mobile via TUI or webview)
+- ✅ React-like API (familiar to web devs)
+- ✅ Hot reload support
+- ✅ Component-based architecture
+- ✅ Fast development
+- ✅ Can target web with same code
+- ✅ Active development
+
+**Cons**:
+- ❌ Mobile support uses webview (not truly native)
+- ❌ Still young and evolving
+- ❌ Less mature than other options
+- ❌ Performance not as good as native solutions
+- ❌ Webview adds overhead on mobile
+
+**Best for**: Web developers wanting familiar patterns, prioritizing web deployment.
+
+**Startup time estimate**: 200-400ms (desktop), slower on mobile (webview)
+**Binary size**: 4-8MB (includes webview on mobile)
+
+---
+
+### Option 5: Tauri (Web Tech + Rust Backend)
+**Language**: HTML/CSS/JavaScript (or any web framework) + Rust
+**Architecture**: Webview with Rust backend
+
+**Pros**:
+- ✅ Use any web framework (React, Vue, Svelte, etc.)
+- ✅ Rapid UI development with web technologies
+- ✅ Small binary size (uses system webview)
+- ✅ Desktop support excellent (Windows, Linux, macOS)
+- ✅ Mobile support coming (Tauri Mobile)
+- ✅ Large ecosystem of web UI libraries
+- ✅ Familiar to web developers
+- ✅ Hot reload support
+
+**Cons**:
+- ❌ Depends on system webview (consistency issues)
+- ❌ Mobile support still in beta
+- ❌ Not truly native look/feel
+- ❌ Performance worse than native solutions
+- ❌ Startup time slower (webview initialization)
+- ❌ Requires web dev skills
+- ❌ More complex build process
+
+**Best for**: Teams with web dev experience, if you want to use React/Vue/Svelte.
+
+**Startup time estimate**: 300-800ms (webview initialization)
+**Binary size**: 1-3MB (uses system webview)
+
+---
+
+### Option 6: Slint (Declarative UI)
+**Language**: Slint language + Rust
+**Architecture**: Declarative markup language
+
+**Pros**:
+- ✅ True cross-platform (desktop, embedded, mobile coming)
+- ✅ Declarative UI with .slint files
+- ✅ Native rendering (no webview)
+- ✅ Good performance
+- ✅ Design tools available
+- ✅ Small binary size
+- ✅ Good documentation
+- ✅ Business-backed (SixtyFPS GmbH)
+
+**Cons**:
+- ❌ Mobile support experimental
+- ❌ Smaller community
+- ❌ Need to learn new markup language
+- ❌ Less flexible than code-based solutions
+- ❌ Dual licensing (GPL or commercial)
+
+**Best for**: If you want declarative UI with good tooling and don't mind learning new syntax.
+
+**Startup time estimate**: 100-250ms
+**Binary size**: 2-4MB
+
+---
+
+### Option 7: Flutter (Dart)
+**Language**: Dart (not Rust!)
+**Architecture**: Widget tree
+
+**Pros**:
+- ✅ Best mobile support (iOS, Android)
+- ✅ Very mature and stable
+- ✅ Huge widget library
+- ✅ Excellent documentation
+- ✅ Great tooling and dev experience
+- ✅ Desktop support good
+- ✅ Beautiful UIs out of the box
+- ✅ Fast startup on mobile
+
+**Cons**:
+- ❌ **Not Rust!** (breaks our stack)
+- ❌ Requires Dart FFI to call Rust backend
+- ❌ Larger binary size (10-20MB)
+- ❌ Different language/ecosystem
+- ❌ More complex integration
+
+**Best for**: If mobile is top priority and you're willing to use Dart + Rust FFI.
+
+**Startup time estimate**: 200-400ms
+**Binary size**: 10-20MB
+
+---
+
+### Option 8: Native Platform UIs (Platform-specific)
+**Language**: Rust + platform bindings
+**Options**: gtk-rs (Linux), windows-rs (Windows), cacao (macOS), UIKit bindings (iOS), Android NDK
+
+**Pros**:
+- ✅ True native look and feel per platform
+- ✅ Best platform integration
+- ✅ Smallest binaries per platform
+- ✅ Fastest startup time
+- ✅ Platform features "just work"
+
+**Cons**:
+- ❌ **Separate codebase per platform**
+- ❌ 5x development effort
+- ❌ Hard to maintain consistency
+- ❌ Need to learn each platform
+- ❌ More testing required
+
+**Best for**: If native feel is paramount and you have resources for multiple codebases.
+
+**Startup time estimate**: 50-150ms (native)
+**Binary size**: 1-3MB per platform
+
+---
+
+## Frontend Framework Recommendation
+
+Based on your requirements (fast startup, cross-platform, potential for game-like polish):
+
+### Recommended: Start with **egui** for Phase 3
+
+**Why egui?**
+1. **Fastest time to market**: Rich widgets out of the box
+2. **Good performance**: Fast startup, low overhead
+3. **Cross-platform**: Desktop works great, mobile possible
+4. **Simple integration**: Easy to connect to `bevy-tasks-core`
+5. **Validate UX**: Test core app experience quickly
+6. **Path forward**: Can always switch to Bevy later if you want game-like features
+
+### Alternative path: **Bevy** for unique polish
+
+**Choose Bevy if:**
+- You want game-like animations from the start
+- You're excited about building custom UI
+- You value long-term flexibility over short-term speed
+- You want a unique, polished look
+
+### Hybrid approach (Recommended)
+
+**Best of both worlds:**
+1. Build Phase 3 MVP with **egui** (fast iteration)
+2. Validate UX, backend API, and app concept
+3. If you want more polish, rebuild with **Bevy** in Phase 6
+4. Backend stays the same (clean separation!)
+
+This de-risks the project while keeping options open.
+
+### Quick Decision Matrix
+
+| Framework | Startup | Binary | Mobile | Dev Speed | Polish Potential | Learning Curve |
+|-----------|---------|--------|--------|-----------|-----------------|----------------|
+| **Bevy**      | ⚠️ Medium | ⚠️ Large | ✅ Good | ⚠️ Slow | ⭐⭐⭐⭐⭐ | Hard |
+| **egui**      | ✅ Fast | ✅ Small | ⚠️ OK | ✅ Fast | ⭐⭐⭐ | Easy |
+| **Iced**      | ✅ Fast | ✅ Small | ❌ Poor | ✅ Good | ⭐⭐⭐ | Medium |
+| **Dioxus**    | ⚠️ Medium | ⚠️ Medium | ⚠️ Webview | ✅ Fast | ⭐⭐ | Easy (if React) |
+| **Tauri**     | ❌ Slow | ✅ Small | ⚠️ Beta | ✅ Very Fast | ⭐⭐ | Easy (web) |
+| **Slint**     | ✅ Fast | ✅ Small | ⚠️ Exp | ⚠️ Medium | ⭐⭐⭐ | Medium |
+| **Flutter**   | ✅ Fast | ⚠️ Large | ⭐⭐⭐⭐⭐ | ✅ Very Fast | ⭐⭐⭐⭐ | Medium (Dart) |
+| **Native**    | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ❌ Very Slow | ⭐⭐⭐⭐ | Very Hard |
+
 ## Dependencies
 
-### Core Dependencies
+### Workspace Structure (Cargo.toml)
 ```toml
-[dependencies]
-bevy = "0.16"
+[workspace]
+members = [
+    "crates/bevy-tasks-core",
+    "crates/bevy-tasks-cli",
+    "crates/bevy-tasks-gui",
+]
+resolver = "2"
+
+[workspace.dependencies]
+# Shared dependencies
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_yaml = "0.9"  # For frontmatter parsing
-pulldown-cmark = "0.9"  # Markdown parsing
 uuid = { version = "1.0", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-directories = "5.0"
-tokio = { version = "1.0", features = ["full"] }
 anyhow = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+```
+
+### Core Library (bevy-tasks-core/Cargo.toml)
+```toml
+[package]
+name = "bevy-tasks-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = "1.0"
+serde_yaml = "0.9"  # YAML frontmatter parsing
+pulldown-cmark = "0.12"  # Markdown parsing
+uuid = { workspace = true }
+chrono = { workspace = true }
+directories = "5.0"  # Cross-platform paths
+tokio = { workspace = true }
+anyhow = { workspace = true }
 
 # WebDAV support
-reqwest = { version = "0.11", features = ["json"] }
-# Note: Evaluate dav-client alternatives
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+# TODO: Evaluate dav-client or implement custom WebDAV
 
-# Credential storage (see Authentication Options)
-keyring = "2.0"  # Cross-platform keychain access
+# Credential storage
+keyring = "3.0"  # Cross-platform keychain
+
+[dev-dependencies]
+tempfile = "3.0"  # For testing file operations
+```
+
+### CLI (bevy-tasks-cli/Cargo.toml)
+```toml
+[package]
+name = "bevy-tasks-cli"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "bevy-tasks"
+path = "src/main.rs"
+
+[dependencies]
+bevy-tasks-core = { path = "../bevy-tasks-core" }
+clap = { version = "4.5", features = ["derive", "env"] }
+colored = "2.0"  # Terminal colors
+indicatif = "0.17"  # Progress bars
+anyhow = { workspace = true }
+tokio = { workspace = true }
+```
+
+### GUI (bevy-tasks-gui/Cargo.toml)
+```toml
+[package]
+name = "bevy-tasks-gui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy-tasks-core = { path = "../bevy-tasks-core" }
+anyhow = { workspace = true }
+
+# GUI framework - TBD based on chosen option
+# Option 1: Bevy
+# bevy = { version = "0.16", default-features = false, features = ["bevy_ui", "bevy_render", "bevy_winit"] }
+
+# Option 2: egui (Recommended for MVP)
+# eframe = "0.31"
+# egui = "0.31"
+
+# Option 3: Iced
+# iced = { version = "0.13", features = ["tokio"] }
+
+# Option 4: Dioxus
+# dioxus = "0.6"
+# dioxus-desktop = "0.6"
 
 # Platform-specific
 [target.'cfg(target_os = "android")'.dependencies]
@@ -410,8 +877,8 @@ keyring = "2.0"  # Cross-platform keychain access
 ## Getting Started
 
 ### Prerequisites
-- Rust 1.75+ (Bevy 0.16 requirement)
-- Platform-specific tools:
+- Rust 1.75+ (2024 edition)
+- Platform-specific tools (for mobile builds later):
   - **iOS**: macOS + Xcode
   - **Android**: Android SDK + NDK
 
@@ -421,87 +888,62 @@ keyring = "2.0"  # Cross-platform keychain access
 git clone <repository-url>
 cd bevy-tasks
 
-# Run desktop version
-cargo run
+# Build all workspace members
+cargo build
+
+# Run tests for core library
+cargo test -p bevy-tasks-core
+
+# Run CLI
+cargo run -p bevy-tasks-cli -- --help
+cargo run -p bevy-tasks-cli -- init ~/test-tasks
+
+# Run GUI (once implemented)
+cargo run -p bevy-tasks-gui
 
 # Build for release
-cargo build --release
+cargo build --release -p bevy-tasks-cli
+cargo build --release -p bevy-tasks-gui
 
-# Run tests
-cargo test
+# Run all tests
+cargo test --workspace
+```
 
-# Build for Android
-cargo apk build --release
+### Development Workflow (Phase 1)
 
-# Build for iOS (on macOS)
-cargo build --target aarch64-apple-ios --release
+1. **Start with Core Library**:
+```bash
+cd crates/bevy-tasks-core
+cargo test --watch  # with cargo-watch
+```
+
+2. **Build CLI to test backend**:
+```bash
+cd crates/bevy-tasks-cli
+cargo run -- init ~/my-tasks
+cargo run -- add "Test task"
+cargo run -- list
+```
+
+3. **Iterate on API**:
+- Add features to core library
+- Test via CLI
+- Write integration tests
+- Document public API
+
+4. **Add GUI later** (Phase 3):
+```bash
+cd crates/bevy-tasks-gui
+cargo run
 ```
 
 ## Questions & Decisions
 
-### 1. UI Framework: bevy_ui vs bevy_egui
+### 1. Frontend Framework Choice
 
-#### Option A: Pure bevy_ui
-**Pros**:
-- Native to Bevy, no additional dependencies
-- Full control over rendering and styling
-- Better performance (no intermediate UI layer)
-- Fits Bevy's ECS paradigm perfectly
-- More flexibility for game-like UX polish later
-- Smaller binary size
-- Consistent cross-platform look
+**Status**: See "Frontend Framework Comparison" section above for detailed analysis.
 
-**Cons**:
-- More verbose, lower-level API
-- Need to build complex widgets from scratch
-- Text input handling requires more work
-- Fewer built-in widgets
-- Steeper learning curve for complex layouts
-- More code to maintain
-
-**Best for**: If you want maximum performance, full control, and are willing to invest time building custom widgets.
-
-#### Option B: bevy_egui
-**Pros**:
-- Rich set of built-in widgets (text input, combo boxes, etc.)
-- Immediate mode GUI is simple to reason about
-- Rapid prototyping and iteration
-- Good text editing support out of the box
-- Mature ecosystem
-- Less code for standard UI patterns
-- Better accessibility features
-
-**Cons**:
-- Additional dependency (~500KB+)
-- Slight performance overhead
-- Less control over rendering
-- Immediate mode pattern conflicts with ECS
-- Harder to achieve game-like polish
-- Less Bevy-native feel
-- More challenging to customize appearance
-
-**Best for**: If you want to ship quickly with standard UI widgets and don't need deep customization.
-
-#### Option C: Hybrid Approach
-Use **bevy_ui** for primary interface (task lists, main views) and **bevy_egui** for complex forms and settings screens.
-
-**Pros**:
-- Best of both worlds
-- Use right tool for each job
-- Fast development where needed, optimized where it matters
-
-**Cons**:
-- Two UI systems to learn and maintain
-- Increased binary size
-- Inconsistent look without careful styling
-
-#### Recommendation
-Start with **pure bevy_ui** for MVP. The task list UI is relatively simple (lists, buttons, text), and this gives you:
-- Maximum performance for fast startup
-- Foundation for future game-like polish
-- Full control over mobile UX
-
-Reserve bevy_egui as a fallback if text editing becomes too complex to implement.
+**Current Recommendation**: Start with **egui** for Phase 3 (fast MVP), optionally migrate to **Bevy** in Phase 6 for polish.
 
 ---
 
@@ -630,6 +1072,6 @@ To be determined.
 
 ---
 
-**Last Updated**: 2025-10-26
-**Document Version**: 1.1
-**Status**: Planning Phase
+**Last Updated**: 2025-10-27
+**Document Version**: 2.0
+**Status**: Planning Phase - Backend/Frontend Separation Decided
