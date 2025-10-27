@@ -751,7 +751,9 @@ If you want game-like polish after Phase 7:
 
 ## License
 
-To be determined.
+[GNU General Public License v3.0 (GPL-3.0)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
+This project is free and open-source software licensed under GPL v3.
 
 ---
 
