@@ -19,6 +19,39 @@ A **local-first, cross-platform tasks application** inspired by Google Tasks. Bu
 
 ---
 
+## Development Guidelines
+
+### Testing Strategy
+- **Unit tests**: Data models and business logic
+- **Integration tests**: Storage layer operations
+- **E2E tests**: Critical user flows
+- **Performance tests**: Startup time, large datasets
+- **Platform tests**: Verify each platform build
+
+### Performance Budgets
+- **Cold start**: < 200ms on desktop, < 500ms on mobile
+- **First render**: < 100ms
+- **Task creation**: < 50ms
+- **Sync operation**: < 2s for typical dataset (< 1000 tasks)
+- **Memory usage**: < 50MB on mobile, < 100MB on desktop
+
+### Version Scheme
+Semantic versioning: `0.1.0 → 1.0.0`
+
+### CI/CD
+GitHub Actions for all platforms
+
+---
+
+## Resources
+
+- [Bevy Documentation](https://bevyengine.org/)
+- [egui Documentation](https://docs.rs/egui/)
+- [WebDAV RFC 4918](https://datatracker.ietf.org/doc/html/rfc4918)
+- [Google Tasks API](https://developers.google.com/tasks) (for importer reference)
+
+---
+
 ## Phase 1: Core Library & CLI MVP
 
 **Goal**: Build and validate the backend with a functional CLI
@@ -715,37 +748,6 @@ If you want game-like polish after Phase 7:
 - Direct downloads (all platforms)
 
 ---
-
-## Development Guidelines
-
-### Testing Strategy
-- **Unit tests**: Data models and business logic
-- **Integration tests**: Storage layer operations
-- **E2E tests**: Critical user flows
-- **Performance tests**: Startup time, large datasets
-- **Platform tests**: Verify each platform build
-
-### Performance Budgets
-- **Cold start**: < 200ms on desktop, < 500ms on mobile
-- **First render**: < 100ms
-- **Task creation**: < 50ms
-- **Sync operation**: < 2s for typical dataset (< 1000 tasks)
-- **Memory usage**: < 50MB on mobile, < 100MB on desktop
-
-### Version Scheme
-Semantic versioning: `0.1.0 → 1.0.0`
-
-### CI/CD
-GitHub Actions for all platforms
-
----
-
-## Resources
-
-- [Bevy Documentation](https://bevyengine.org/)
-- [egui Documentation](https://docs.rs/egui/)
-- [WebDAV RFC 4918](https://datatracker.ietf.org/doc/html/rfc4918)
-- [Google Tasks API](https://developers.google.com/tasks) (for importer reference)
 
 ## License
 
