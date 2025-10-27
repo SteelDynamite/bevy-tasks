@@ -373,10 +373,8 @@ bevy-tasks sync --status
 ### Phase 3: GUI MVP (Desktop)
 **Goal**: Build graphical interface on desktop platforms
 
-**Frontend Decision**: Choose frontend framework (see Frontend Comparison section)
-
 **Features**:
-- [ ] GUI framework integration
+- [ ] egui framework integration
 - [ ] Basic task list view
 - [ ] Create/edit/delete tasks
 - [ ] Mark tasks complete
@@ -390,8 +388,31 @@ bevy-tasks sync --status
 - Clean, minimal UI
 - Feature parity with CLI
 
-### Phase 4: GUI Advanced Features (Desktop)
-**Goal**: Feature parity with Google Tasks
+### Phase 4: Mobile Basic Support
+**Goal**: Get app running on iOS and Android ASAP, even if basic
+
+**Priority**: Early validation of mobile platform, test infrastructure
+
+**Features**:
+- [ ] iOS build pipeline setup
+- [ ] Android build pipeline setup
+- [ ] Basic egui mobile adaptation
+- [ ] Simple UI with core features (even if just test buttons)
+- [ ] File system access on mobile
+- [ ] Basic task CRUD on mobile
+- [ ] Folder picker for mobile
+
+**Deliverables**:
+- App launches on iOS
+- App launches on Android
+- Can create and view tasks on mobile
+- Validates cross-platform architecture
+- Foundation for future mobile polish
+
+**Note**: This phase prioritizes getting mobile working early, even with a simple test UI. Polish comes later.
+
+### Phase 5: GUI Advanced Features (Desktop + Mobile)
+**Goal**: Feature parity with Google Tasks across all platforms
 
 **Features**:
 - [ ] Multiple task lists (folders)
@@ -399,53 +420,63 @@ bevy-tasks sync --status
 - [ ] Subtasks support
 - [ ] Due dates with date picker
 - [ ] Rich markdown editor for task notes
-- [ ] Drag & drop reordering
+- [ ] Drag & drop reordering (desktop)
+- [ ] Swipe gestures (mobile)
 - [ ] Move tasks between lists
 - [ ] Change storage folder location in settings
-- [ ] Keyboard shortcuts
+- [ ] Keyboard shortcuts (desktop)
 - [ ] Search functionality
+- [ ] Pull-to-refresh (mobile)
 
 **Deliverables**:
-- Full-featured desktop task manager
-- Polished UX
-- Keyboard-driven workflow
+- Full-featured task manager on all platforms
+- Polished UX on desktop
+- Touch-optimized UX on mobile
+- Consistent feature set
 
-### Phase 5: Mobile Support
-**Goal**: Deploy to iOS and Android
+### Phase 6: Mobile Polish & Platform-Specific Features
+**Goal**: Native mobile experience and platform integration
 
 **Features**:
-- [ ] Touch-optimized UI
-- [ ] iOS build pipeline
-- [ ] Android build pipeline
-- [ ] Mobile-specific UX (swipe gestures, pull-to-refresh)
 - [ ] Background sync on mobile
-- [ ] Mobile file system integration
-- [ ] Share extension (share to tasks)
-- [ ] Native mobile feel
+- [ ] Share extension (share to tasks on iOS/Android)
+- [ ] Widgets (iOS/Android home screen widgets)
+- [ ] Notifications for due dates
+- [ ] Quick capture shortcuts
+- [ ] Haptic feedback
+- [ ] Platform-specific gestures and animations
+- [ ] App icon badge with task count
 
 **Deliverables**:
-- Working iOS app
-- Working Android app
-- Consistent UX across mobile and desktop
+- Native-feeling mobile apps
+- Deep platform integration
+- Mobile-specific features
 
-### Phase 6: Polish & Advanced Features
+### Phase 7: Advanced Features & Imports
 **Goal**: Differentiate from Google Tasks, add unique features
 
 **Features**:
+- [ ] **Google Tasks importer** (migrate from Google Tasks)
 - [ ] Themes and customization
-- [ ] Advanced animations and transitions (if using Bevy)
 - [ ] Full-text search across tasks
 - [ ] Filters and smart lists
 - [ ] Task templates
 - [ ] Recurring tasks
 - [ ] Statistics and insights
-- [ ] Export/import (backup)
+- [ ] Tags and custom fields
+- [ ] Export/import (backup/restore)
+- [ ] Bulk operations
+- [ ] Advanced animations (consider Bevy migration)
 - [ ] Plugin system for extensions (optional)
-- [ ] Game-like achievements (optional, if using Bevy)
+- [ ] Calendar integration
+- [ ] Email to task
+- [ ] Voice input
+- [ ] Collaboration features (share lists)
 
 **Deliverables**:
 - Polished, delightful UX
 - Unique features not in Google Tasks
+- Easy migration path from Google Tasks
 - Distribution to all app stores
 
 ## Development Guidelines
@@ -466,15 +497,15 @@ bevy-tasks sync --status
 
 ### Build & Release
 - **CI/CD**: GitHub Actions for all platforms
-- **Initial Distribution**:
+- **Initial Distribution** (Phases 3-4):
   - **Desktop**: Direct downloads and sideloading
     - Linux: AppImage, .tar.gz
     - macOS: DMG
     - Windows: MSI, portable .exe
-  - **Mobile**: Sideloading only
-    - iOS: .ipa for TestFlight/direct install
-    - Android: .apk
-- **Future Distribution Channels** (Phase 5+):
+  - **Mobile**: Sideloading and TestFlight
+    - iOS: .ipa for TestFlight (early access)
+    - Android: .apk (direct install)
+- **Future Distribution Channels** (Phase 7):
   - **F-Droid**: FOSS Android app store
   - **Flathub**: Linux Flatpak repository
   - **Google Play Store**: Android
@@ -499,10 +530,13 @@ bevy-tasks sync --status
 **Problem**: iOS and Android have different requirements
 
 **Solutions**:
+- **Early mobile testing** (Phase 4) - validate cross-platform architecture ASAP
+- Start with simple test UI to verify builds work
 - Use conditional compilation for platform-specific code
-- Test early and often on real devices
-- Follow platform guidelines (iOS HIG, Material Design)
-- Use platform-specific file pickers and sharing
+- Test on real devices early and often
+- egui's touch support as starting point, enhance as needed
+- Follow platform guidelines (iOS HIG, Material Design) in later phases
+- Use platform-specific file pickers and sharing (via native bridges)
 
 ### Challenge 3: WebDAV Reliability
 **Problem**: Network can be unreliable, auth can be complex
@@ -528,36 +562,42 @@ bevy-tasks sync --status
 
 **Decision Made**: Hybrid approach with **egui** for Phase 3, optional **Bevy** migration in Phase 6.
 
-### Phase 3-5: egui (Immediate Mode GUI)
+### Phase 3-6: egui (Immediate Mode GUI)
 
-**Why egui for MVP?**
+**Why egui for MVP and mobile?**
 - ✅ Fast development with rich built-in widgets
 - ✅ Excellent text editing and form support out of the box
 - ✅ Small binary size (~2-3MB stripped)
 - ✅ Fast startup time (100-200ms)
 - ✅ Mature and stable
 - ✅ Simple immediate-mode API
-- ✅ Cross-platform (desktop primary, mobile possible)
+- ✅ Cross-platform (desktop AND mobile)
 - ✅ Easy integration with `bevy-tasks-core`
+- ✅ **Mobile builds possible early** - can test on iOS/Android quickly
 
 **Trade-offs**:
 - ⚠️ Less flexibility for custom animations
-- ⚠️ Mobile support less mature (but improving)
+- ⚠️ Mobile UX requires extra work for touch optimization
 - ⚠️ Not as "game-like" polish potential
 
-### Phase 6 (Optional): Migration to Bevy
+**Mobile Strategy with egui**:
+- Phase 4: Get basic egui running on mobile (even simple test UI)
+- Phase 5: Improve touch handling and mobile UX
+- Phase 6: Add platform-specific mobile features
 
-**If you want game-like polish later:**
+### Phase 7 (Optional): Migration to Bevy
+
+**If you want game-like polish later (after Phase 7):**
 - ✅ Full control over animations and rendering
 - ✅ Unique, polished look beyond standard apps
-- ✅ Better mobile support (iOS/Android)
+- ✅ Mature mobile support (iOS/Android)
 - ✅ ECS architecture for complex interactions
 - ✅ Backend stays identical (clean separation!)
 
 **Why this works:**
 The `bevy-tasks-core` library is UI-framework agnostic, so switching from egui to Bevy only requires rewriting the `bevy-tasks-gui` crate. All business logic, file I/O, sync, and testing remains unchanged.
 
-This approach de-risks the project: validate the concept with egui, then optionally invest in custom polish with Bevy if the app takes off.
+This approach de-risks the project: validate the concept with egui (including mobile in Phase 4!), then optionally invest in custom polish with Bevy if the app takes off.
 
 ## Dependencies
 
@@ -846,5 +886,5 @@ To be determined.
 ---
 
 **Last Updated**: 2025-10-27
-**Document Version**: 2.2
-**Status**: Ready to Implement - User-Controlled Storage
+**Document Version**: 2.3
+**Status**: Ready to Implement - Mobile-First, User-Controlled Storage
