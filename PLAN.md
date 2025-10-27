@@ -273,23 +273,26 @@ pub trait Storage {
 
 #### Fast Startup Requirements
 1. **Minimal initialization**: Load only essential systems
-2. **Lazy UI rendering**: Render visible items first
-3. **Background loading**: Load non-critical data after first frame
-4. **Asset optimization**: Embed minimal assets, load rest async
-5. **Incremental parsing**: Stream large data files
+2. **Lazy data loading**: Load visible tasks first
+3. **Background operations**: Non-critical data and sync after first render
+4. **Efficient file I/O**: Stream large markdown files
+5. **Small binary size**: Minimal dependencies in core library
 
-#### Startup Sequence
-1. Initialize Bevy minimal plugins (< 50ms)
+#### Startup Sequence (egui GUI)
+1. Initialize eframe window (< 50ms)
 2. Load config from disk (< 20ms)
-3. Render splash/empty state (first frame < 100ms)
-4. Load task lists in background
-5. Render tasks as they load
-6. Start WebDAV sync (if configured)
+3. Render empty UI (first frame < 100ms)
+4. Load current task list in background
+5. Update UI as tasks load (incremental rendering)
+6. Start WebDAV sync in background (if configured)
+
+**Target**: < 200ms cold start on desktop
 
 #### Memory Optimization
 - Use `Vec` instead of `HashMap` for small collections
 - Limit rendered tasks to visible viewport
-- Unload non-visible screens from memory
+- Lazy load task lists (only load selected list)
+- Stream markdown parsing for large files
 
 ## Feature Roadmap
 
@@ -460,14 +463,15 @@ bevy-tasks sync --status
 
 ## Technical Challenges & Solutions
 
-### Challenge 1: Fast Startup with Bevy
-**Problem**: Bevy's plugin system can add overhead
+### Challenge 1: Fast Startup with GUI
+**Problem**: UI initialization can add overhead
 
-**Solutions**:
-- Use `MinimalPlugins` instead of `DefaultPlugins`
-- Add only required plugins (rendering, input)
-- Lazy-load audio, asset server if not needed immediately
+**Solutions (egui)**:
+- Use eframe with minimal features
+- Defer loading of non-visible data
+- Initialize window before loading tasks
 - Profile startup and optimize hot paths
+- Keep core library dependency-light
 
 ### Challenge 2: Mobile Platform Support
 **Problem**: iOS and Android have different requirements
@@ -498,277 +502,40 @@ bevy-tasks sync --status
 - Users handle their own backups (external to app)
 - Migration can be done in-place by updating frontmatter
 
-## Frontend Framework Comparison
+## Frontend Framework Decision
 
-Now that we have backend/frontend separation, we can evaluate multiple GUI framework options. The backend (`bevy-tasks-core`) is framework-agnostic.
+**Decision Made**: Hybrid approach with **egui** for Phase 3, optional **Bevy** migration in Phase 6.
 
-### Option 1: Bevy (Game Engine)
-**Language**: Rust
-**Architecture**: ECS (Entity Component System)
+### Phase 3-5: egui (Immediate Mode GUI)
 
-**Pros**:
-- ✅ True cross-platform (Windows, Linux, macOS, iOS, Android, WASM)
-- ✅ Excellent performance (60+ FPS easily)
-- ✅ Future game-like polish and animations
-- ✅ Active community and development
-- ✅ Full control over rendering
-- ✅ Single codebase for all platforms
-- ✅ Fast startup possible with `MinimalPlugins`
-
-**Cons**:
-- ❌ UI system is still maturing (bevy_ui improving but limited)
-- ❌ More code required for standard widgets
-- ❌ Steeper learning curve (ECS paradigm)
-- ❌ Larger binary size (~5-10MB stripped)
-- ❌ Text input handling requires extra work
-- ❌ Not designed for traditional UIs
-
-**Best for**: If you want game-like polish, animations, and are willing to build custom UI components.
-
-**Startup time estimate**: 200-500ms
-**Binary size**: 5-10MB (stripped)
-
----
-
-### Option 2: egui (Immediate Mode GUI)
-**Language**: Rust
-**Integration**: Standalone or with eframe
-
-**Pros**:
-- ✅ True cross-platform (desktop, WASM, can run on mobile)
-- ✅ Very simple API (immediate mode)
-- ✅ Rich built-in widgets
-- ✅ Excellent text editing support
-- ✅ Small binary size (~2-3MB)
-- ✅ Fast development iteration
+**Why egui for MVP?**
+- ✅ Fast development with rich built-in widgets
+- ✅ Excellent text editing and form support out of the box
+- ✅ Small binary size (~2-3MB stripped)
+- ✅ Fast startup time (100-200ms)
 - ✅ Mature and stable
-- ✅ Good performance
-- ✅ Works with multiple backends (glow, wgpu)
+- ✅ Simple immediate-mode API
+- ✅ Cross-platform (desktop primary, mobile possible)
+- ✅ Easy integration with `bevy-tasks-core`
 
-**Cons**:
-- ❌ Mobile support exists but less mature
-- ❌ Immediate mode can be unusual coming from retained mode
-- ❌ Less flexibility for custom animations
-- ❌ Harder to achieve "game-like" polish
-- ❌ Less native feel on each platform
+**Trade-offs**:
+- ⚠️ Less flexibility for custom animations
+- ⚠️ Mobile support less mature (but improving)
+- ⚠️ Not as "game-like" polish potential
 
-**Best for**: Quick development, standard UI needs, if you don't need game-like features.
+### Phase 6 (Optional): Migration to Bevy
 
-**Startup time estimate**: 100-200ms
-**Binary size**: 2-3MB (stripped)
+**If you want game-like polish later:**
+- ✅ Full control over animations and rendering
+- ✅ Unique, polished look beyond standard apps
+- ✅ Better mobile support (iOS/Android)
+- ✅ ECS architecture for complex interactions
+- ✅ Backend stays identical (clean separation!)
 
----
+**Why this works:**
+The `bevy-tasks-core` library is UI-framework agnostic, so switching from egui to Bevy only requires rewriting the `bevy-tasks-gui` crate. All business logic, file I/O, sync, and testing remains unchanged.
 
-### Option 3: Iced (Elm-inspired)
-**Language**: Rust
-**Architecture**: The Elm Architecture (TEA)
-
-**Pros**:
-- ✅ Cross-platform (Windows, Linux, macOS, WASM)
-- ✅ Declarative, reactive UI (similar to SwiftUI/Flutter)
-- ✅ Clean architecture with clear state management
-- ✅ Type-safe
-- ✅ Good widget library
-- ✅ Native-feeling widgets
-- ✅ Async support built-in
-- ✅ Medium binary size (~3-5MB)
-
-**Cons**:
-- ❌ Mobile support experimental (iOS/Android not production-ready)
-- ❌ Smaller community than egui or Bevy
-- ❌ Still evolving (breaking changes possible)
-- ❌ Limited animation capabilities
-- ❌ Less documentation than mature frameworks
-
-**Best for**: If you like reactive/declarative UIs and primarily target desktop + WASM.
-
-**Startup time estimate**: 150-300ms
-**Binary size**: 3-5MB (stripped)
-
----
-
-### Option 4: Dioxus (React-like)
-**Language**: Rust
-**Architecture**: Virtual DOM with React-like hooks
-
-**Pros**:
-- ✅ Cross-platform (desktop, web, mobile via TUI or webview)
-- ✅ React-like API (familiar to web devs)
-- ✅ Hot reload support
-- ✅ Component-based architecture
-- ✅ Fast development
-- ✅ Can target web with same code
-- ✅ Active development
-
-**Cons**:
-- ❌ Mobile support uses webview (not truly native)
-- ❌ Still young and evolving
-- ❌ Less mature than other options
-- ❌ Performance not as good as native solutions
-- ❌ Webview adds overhead on mobile
-
-**Best for**: Web developers wanting familiar patterns, prioritizing web deployment.
-
-**Startup time estimate**: 200-400ms (desktop), slower on mobile (webview)
-**Binary size**: 4-8MB (includes webview on mobile)
-
----
-
-### Option 5: Tauri (Web Tech + Rust Backend)
-**Language**: HTML/CSS/JavaScript (or any web framework) + Rust
-**Architecture**: Webview with Rust backend
-
-**Pros**:
-- ✅ Use any web framework (React, Vue, Svelte, etc.)
-- ✅ Rapid UI development with web technologies
-- ✅ Small binary size (uses system webview)
-- ✅ Desktop support excellent (Windows, Linux, macOS)
-- ✅ Mobile support coming (Tauri Mobile)
-- ✅ Large ecosystem of web UI libraries
-- ✅ Familiar to web developers
-- ✅ Hot reload support
-
-**Cons**:
-- ❌ Depends on system webview (consistency issues)
-- ❌ Mobile support still in beta
-- ❌ Not truly native look/feel
-- ❌ Performance worse than native solutions
-- ❌ Startup time slower (webview initialization)
-- ❌ Requires web dev skills
-- ❌ More complex build process
-
-**Best for**: Teams with web dev experience, if you want to use React/Vue/Svelte.
-
-**Startup time estimate**: 300-800ms (webview initialization)
-**Binary size**: 1-3MB (uses system webview)
-
----
-
-### Option 6: Slint (Declarative UI)
-**Language**: Slint language + Rust
-**Architecture**: Declarative markup language
-
-**Pros**:
-- ✅ True cross-platform (desktop, embedded, mobile coming)
-- ✅ Declarative UI with .slint files
-- ✅ Native rendering (no webview)
-- ✅ Good performance
-- ✅ Design tools available
-- ✅ Small binary size
-- ✅ Good documentation
-- ✅ Business-backed (SixtyFPS GmbH)
-
-**Cons**:
-- ❌ Mobile support experimental
-- ❌ Smaller community
-- ❌ Need to learn new markup language
-- ❌ Less flexible than code-based solutions
-- ❌ Dual licensing (GPL or commercial)
-
-**Best for**: If you want declarative UI with good tooling and don't mind learning new syntax.
-
-**Startup time estimate**: 100-250ms
-**Binary size**: 2-4MB
-
----
-
-### Option 7: Flutter (Dart)
-**Language**: Dart (not Rust!)
-**Architecture**: Widget tree
-
-**Pros**:
-- ✅ Best mobile support (iOS, Android)
-- ✅ Very mature and stable
-- ✅ Huge widget library
-- ✅ Excellent documentation
-- ✅ Great tooling and dev experience
-- ✅ Desktop support good
-- ✅ Beautiful UIs out of the box
-- ✅ Fast startup on mobile
-
-**Cons**:
-- ❌ **Not Rust!** (breaks our stack)
-- ❌ Requires Dart FFI to call Rust backend
-- ❌ Larger binary size (10-20MB)
-- ❌ Different language/ecosystem
-- ❌ More complex integration
-
-**Best for**: If mobile is top priority and you're willing to use Dart + Rust FFI.
-
-**Startup time estimate**: 200-400ms
-**Binary size**: 10-20MB
-
----
-
-### Option 8: Native Platform UIs (Platform-specific)
-**Language**: Rust + platform bindings
-**Options**: gtk-rs (Linux), windows-rs (Windows), cacao (macOS), UIKit bindings (iOS), Android NDK
-
-**Pros**:
-- ✅ True native look and feel per platform
-- ✅ Best platform integration
-- ✅ Smallest binaries per platform
-- ✅ Fastest startup time
-- ✅ Platform features "just work"
-
-**Cons**:
-- ❌ **Separate codebase per platform**
-- ❌ 5x development effort
-- ❌ Hard to maintain consistency
-- ❌ Need to learn each platform
-- ❌ More testing required
-
-**Best for**: If native feel is paramount and you have resources for multiple codebases.
-
-**Startup time estimate**: 50-150ms (native)
-**Binary size**: 1-3MB per platform
-
----
-
-## Frontend Framework Recommendation
-
-Based on your requirements (fast startup, cross-platform, potential for game-like polish):
-
-### Recommended: Start with **egui** for Phase 3
-
-**Why egui?**
-1. **Fastest time to market**: Rich widgets out of the box
-2. **Good performance**: Fast startup, low overhead
-3. **Cross-platform**: Desktop works great, mobile possible
-4. **Simple integration**: Easy to connect to `bevy-tasks-core`
-5. **Validate UX**: Test core app experience quickly
-6. **Path forward**: Can always switch to Bevy later if you want game-like features
-
-### Alternative path: **Bevy** for unique polish
-
-**Choose Bevy if:**
-- You want game-like animations from the start
-- You're excited about building custom UI
-- You value long-term flexibility over short-term speed
-- You want a unique, polished look
-
-### Hybrid approach (Recommended)
-
-**Best of both worlds:**
-1. Build Phase 3 MVP with **egui** (fast iteration)
-2. Validate UX, backend API, and app concept
-3. If you want more polish, rebuild with **Bevy** in Phase 6
-4. Backend stays the same (clean separation!)
-
-This de-risks the project while keeping options open.
-
-### Quick Decision Matrix
-
-| Framework | Startup | Binary | Mobile | Dev Speed | Polish Potential | Learning Curve |
-|-----------|---------|--------|--------|-----------|-----------------|----------------|
-| **Bevy**      | ⚠️ Medium | ⚠️ Large | ✅ Good | ⚠️ Slow | ⭐⭐⭐⭐⭐ | Hard |
-| **egui**      | ✅ Fast | ✅ Small | ⚠️ OK | ✅ Fast | ⭐⭐⭐ | Easy |
-| **Iced**      | ✅ Fast | ✅ Small | ❌ Poor | ✅ Good | ⭐⭐⭐ | Medium |
-| **Dioxus**    | ⚠️ Medium | ⚠️ Medium | ⚠️ Webview | ✅ Fast | ⭐⭐ | Easy (if React) |
-| **Tauri**     | ❌ Slow | ✅ Small | ⚠️ Beta | ✅ Very Fast | ⭐⭐ | Easy (web) |
-| **Slint**     | ✅ Fast | ✅ Small | ⚠️ Exp | ⚠️ Medium | ⭐⭐⭐ | Medium |
-| **Flutter**   | ✅ Fast | ⚠️ Large | ⭐⭐⭐⭐⭐ | ✅ Very Fast | ⭐⭐⭐⭐ | Medium (Dart) |
-| **Native**    | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ❌ Very Slow | ⭐⭐⭐⭐ | Very Hard |
+This approach de-risks the project: validate the concept with egui, then optionally invest in custom polish with Bevy if the app takes off.
 
 ## Dependencies
 
@@ -851,27 +618,19 @@ edition = "2024"
 bevy-tasks-core = { path = "../bevy-tasks-core" }
 anyhow = { workspace = true }
 
-# GUI framework - TBD based on chosen option
-# Option 1: Bevy
+# egui for Phase 3-5
+eframe = "0.31"  # egui framework with native windowing
+egui = "0.31"    # Core egui library
+
+# TODO Phase 6: Consider migration to Bevy for game-like polish
 # bevy = { version = "0.16", default-features = false, features = ["bevy_ui", "bevy_render", "bevy_winit"] }
-
-# Option 2: egui (Recommended for MVP)
-# eframe = "0.31"
-# egui = "0.31"
-
-# Option 3: Iced
-# iced = { version = "0.13", features = ["tokio"] }
-
-# Option 4: Dioxus
-# dioxus = "0.6"
-# dioxus-desktop = "0.6"
 
 # Platform-specific
 [target.'cfg(target_os = "android")'.dependencies]
-# Android-specific deps
+# Android-specific deps (Phase 5)
 
 [target.'cfg(target_os = "ios")'.dependencies]
-# iOS-specific deps
+# iOS-specific deps (Phase 5)
 ```
 
 ## Getting Started
@@ -939,15 +698,7 @@ cargo run
 
 ## Questions & Decisions
 
-### 1. Frontend Framework Choice
-
-**Status**: See "Frontend Framework Comparison" section above for detailed analysis.
-
-**Current Recommendation**: Start with **egui** for Phase 3 (fast MVP), optionally migrate to **Bevy** in Phase 6 for polish.
-
----
-
-### 2. Authentication Options for WebDAV
+### 1. Authentication for WebDAV Sync
 
 #### Option A: Platform Keychain/Keyring
 **Implementation**: Use `keyring` crate for cross-platform credential storage
@@ -1073,5 +824,5 @@ To be determined.
 ---
 
 **Last Updated**: 2025-10-27
-**Document Version**: 2.0
-**Status**: Planning Phase - Backend/Frontend Separation Decided
+**Document Version**: 2.1
+**Status**: Ready to Implement - egui Hybrid Approach Confirmed
