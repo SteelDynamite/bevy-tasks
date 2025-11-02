@@ -90,10 +90,15 @@ Task {
 TaskList {
     id: Uuid,
     title: String,              // Derived from folder name
-    tasks: Vec<Task>,
+    tasks: Vec<Task>,           // Ordered according to sort_order preference
     created_at: DateTime,
     updated_at: DateTime,
-    // Note: task_order stored in .listdata.json, not in memory model
+    sort_order: SortOrder,      // How to sort: Manual or ByDueDate
+}
+
+enum SortOrder {
+    Manual,      // Use task_order from .listdata.json
+    ByDueDate,   // Sort by due_date field (tasks without due dates at end)
 }
 
 AppConfig {
@@ -134,6 +139,7 @@ AppConfig {
   "id": "list-uuid-1",
   "created_at": "2025-10-26T10:00:00Z",
   "updated_at": "2025-10-27T14:30:00Z",
+  "sort_order": "manual",
   "task_order": [
     "task-uuid-1",
     "task-uuid-2",
@@ -142,8 +148,15 @@ AppConfig {
 }
 ```
 
+**Sort Order Options**:
+- `"manual"` - Tasks ordered by hand (uses `task_order` array)
+- `"by_due_date"` - Tasks automatically sorted by due date (tasks without due dates appear at end)
+
+When `sort_order` is `"manual"`, the `task_order` array defines the sequence. When `sort_order` is `"by_due_date"`, tasks are sorted dynamically and `task_order` is ignored.
+
 **Benefits**:
-- **Ordering in list metadata**: Reordering tasks only touches `.listdata.json`
+- **Two sort modes**: Manual ordering or automatic by due date
+- **Ordering in list metadata**: Changing manual order only touches `.listdata.json`
 - **Portable lists**: Copy/move a list folder and its metadata stays with it
 - **Clean structure**: No nested hidden folders, just hidden files
 - **WebDAV-friendly**: Syncing a list syncs its metadata naturally
@@ -179,6 +192,10 @@ impl TaskRepository {
     // Task ordering (modifies .listdata.json)
     pub fn reorder_task(&mut self, list_id: Uuid, task_id: Uuid, new_position: usize) -> Result<()>;
     pub fn get_task_order(&self, list_id: Uuid) -> Result<Vec<Uuid>>;
+
+    // Sort preference (modifies .listdata.json)
+    pub fn set_sort_order(&mut self, list_id: Uuid, sort_order: SortOrder) -> Result<()>;
+    pub fn get_sort_order(&self, list_id: Uuid) -> Result<SortOrder>;
 }
 
 pub trait Storage {
@@ -262,6 +279,8 @@ tokio = { workspace = true }
 - [ ] CLI: `complete` command (mark done)
 - [ ] CLI: `delete` command (remove tasks)
 - [ ] CLI: `edit` command (modify tasks)
+- [ ] Two sort modes: manual ordering and by due date
+- [ ] CLI: `sort` command (switch between manual/by-due-date)
 - [ ] Comprehensive unit and integration tests (>80% coverage)
 
 ### CLI Usage Examples
@@ -283,6 +302,10 @@ bevy-tasks delete <task-id>
 
 # Change folder location later
 bevy-tasks config set-folder ~/new/location
+
+# Sort order
+bevy-tasks sort manual --list "Work"
+bevy-tasks sort by-due-date --list "Personal"
 ```
 
 ### Deliverables
