@@ -62,7 +62,6 @@ due: 2025-11-15T14:00:00Z
 created: 2025-10-26T10:00:00Z
 updated: 2025-10-26T12:30:00Z
 parent: 550e8400-e29b-41d4-a716-446655440001
-tags: [work, urgent]
 ---
 
 Task description and notes go here in **markdown** format.
@@ -84,8 +83,7 @@ Task {
     due_date: Option<DateTime>, // From frontmatter
     created_at: DateTime,
     updated_at: DateTime,
-    parent_id: Option<Uuid>,
-    tags: Vec<String>,
+    parent_id: Option<Uuid>,    // For subtasks
     // Note: position stored in .listdata.json, not in frontmatter
 }
 
@@ -100,8 +98,7 @@ TaskList {
 
 AppConfig {
     local_path: PathBuf,             // User-selected tasks folder (required)
-    theme: Theme,
-    last_opened_list: Option<Uuid>,
+    // Note: theme and UI preferences added in Phase 3 (GUI)
 }
 ```
 
@@ -332,8 +329,7 @@ AppConfig {
     webdav_url: Option<String>,
     webdav_credentials: Option<Credentials>,
     last_sync: Option<DateTime>,
-    // Note: list_order and last_opened_list now in .metadata.json at root of tasks folder
-    // ...
+    // Note: list_order and last_opened_list in .metadata.json at root of tasks folder
 }
 
 // Add sync methods to TaskRepository
@@ -454,6 +450,21 @@ crates/bevy-tasks-gui/
 - User selects where to store tasks (e.g., `~/Documents/Tasks`)
 - No default hidden directories
 - Remember choice in app config
+
+#### App Configuration (Phase 3+)
+
+**Update AppConfig** to include UI preferences:
+```rust
+AppConfig {
+    local_path: PathBuf,             // From Phase 1
+    webdav_url: Option<String>,      // From Phase 2
+    webdav_credentials: Option<Credentials>,
+    last_sync: Option<DateTime>,
+    theme: Theme,                    // NEW: light/dark mode
+    window_size: Option<(u32, u32)>, // NEW: remember window size
+    last_opened_list: Option<Uuid>,  // NEW: restore last view
+}
+```
 
 ### Dependencies
 
@@ -621,7 +632,7 @@ mod android {
 - [ ] Move tasks between lists
 - [ ] Change storage folder location in settings
 - [ ] Search functionality
-- [ ] Themes (light/dark mode)
+- [ ] Theme selection (light/dark mode)
 
 #### Desktop-Specific
 - [ ] Drag & drop reordering
@@ -702,7 +713,6 @@ mod android {
 - [ ] Easy onboarding for Google Tasks users
 
 #### Advanced Task Management
-- [ ] Tags and custom fields
 - [ ] Recurring tasks (daily, weekly, monthly, custom)
 - [ ] Task templates (save common tasks)
 - [ ] Bulk operations (select multiple, bulk edit)
