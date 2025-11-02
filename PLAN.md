@@ -62,7 +62,6 @@ due: 2025-11-15T14:00:00Z
 created: 2025-10-26T10:00:00Z
 updated: 2025-10-26T12:30:00Z
 parent: 550e8400-e29b-41d4-a716-446655440001
-position: 1
 tags: [work, urgent]
 ---
 
@@ -72,6 +71,8 @@ Task description and notes go here in **markdown** format.
 - Rich formatting
 - Links, etc.
 ```
+
+**Note**: No `position` field in frontmatter - task ordering is stored in the list's `.listdata.json` file. This means reordering tasks only requires updating one file.
 
 **In-Memory Model**:
 ```rust
@@ -84,8 +85,8 @@ Task {
     created_at: DateTime,
     updated_at: DateTime,
     parent_id: Option<Uuid>,
-    position: i32,
     tags: Vec<String>,
+    // Note: position stored in .listdata.json, not in frontmatter
 }
 
 TaskList {
@@ -94,7 +95,7 @@ TaskList {
     tasks: Vec<Task>,
     created_at: DateTime,
     updated_at: DateTime,
-    position: i32,
+    // Note: task_order stored in .listdata.json, not in memory model
 }
 
 AppConfig {
@@ -108,17 +109,47 @@ AppConfig {
 
 ```
 ~/Documents/Tasks/           # User-selected folder
-├── .bevy-tasks/
-│   └── metadata.json        # List ordering, sync state
+├── .metadata.json           # Global: list ordering, last opened list
 ├── My Tasks/                # Task list folder
+│   ├── .listdata.json       # List metadata: task order, id, timestamps
 │   ├── Buy groceries.md
 │   ├── Call dentist.md
 │   └── Project X/           # Subtask folder (optional)
 │       └── Design mockup.md
 └── Work/                    # Another task list
+    ├── .listdata.json
     ├── Review PRs.md
     └── Team meeting prep.md
 ```
+
+**`.metadata.json` (root level)**:
+```json
+{
+  "version": 1,
+  "list_order": ["list-uuid-1", "list-uuid-2"],
+  "last_opened_list": "list-uuid-1"
+}
+```
+
+**`.listdata.json` (per list)**:
+```json
+{
+  "id": "list-uuid-1",
+  "created_at": "2025-10-26T10:00:00Z",
+  "updated_at": "2025-10-27T14:30:00Z",
+  "task_order": [
+    "task-uuid-1",
+    "task-uuid-2",
+    "task-uuid-3"
+  ]
+}
+```
+
+**Benefits**:
+- **Ordering in list metadata**: Reordering tasks only touches `.listdata.json`
+- **Portable lists**: Copy/move a list folder and its metadata stays with it
+- **Clean structure**: No nested hidden folders, just hidden files
+- **WebDAV-friendly**: Syncing a list syncs its metadata naturally
 
 **App Configuration** (separate from task data):
 - Windows: `%APPDATA%/bevy-tasks/config.json`
@@ -147,6 +178,10 @@ impl TaskRepository {
     pub fn create_list(&mut self, name: String) -> Result<TaskList>;
     pub fn get_lists(&self) -> Result<Vec<TaskList>>;
     pub fn delete_list(&mut self, id: Uuid) -> Result<()>;
+
+    // Task ordering (modifies .listdata.json)
+    pub fn reorder_task(&mut self, list_id: Uuid, task_id: Uuid, new_position: usize) -> Result<()>;
+    pub fn get_task_order(&self, list_id: Uuid) -> Result<Vec<Uuid>>;
 }
 
 pub trait Storage {
@@ -293,10 +328,11 @@ Add WebDAV support to `bevy-tasks-core`:
 ```rust
 // Update AppConfig
 AppConfig {
-    local_path: PathBuf,
+    local_path: PathBuf,             // User-selected tasks folder (required)
     webdav_url: Option<String>,
     webdav_credentials: Option<Credentials>,
     last_sync: Option<DateTime>,
+    // Note: list_order and last_opened_list now in .metadata.json at root of tasks folder
     // ...
 }
 
