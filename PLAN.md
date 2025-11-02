@@ -6,40 +6,13 @@ A **local-first, cross-platform tasks application** inspired by Google Tasks. Bu
 
 **Core Principles**:
 - **Local-First**: Your data, your folder, your control
-- **Privacy**: Data stays on your devices and chosen storage
 - **Fast**: Sub-second startup, instant response
-- **Portable**: Plain markdown files, works with any text editor
 - **Cross-Platform**: Single codebase, all platforms
-- **Future-Proof**: Clean architecture enables game-like polish later
 
 **Data Format**: Tasks stored as markdown files with YAML frontmatter (Obsidian-compatible)
 **Storage**: User selects folder location (e.g., `~/Documents/Tasks`, `~/Dropbox/Tasks`)
 **Sync**: Optional WebDAV for cross-device synchronization
 **Architecture**: Backend/frontend separation with CLI-first development
-
----
-
-## Development Guidelines
-
-### Testing Strategy
-- **Unit tests**: Data models and business logic
-- **Integration tests**: Storage layer operations
-- **E2E tests**: Critical user flows
-- **Performance tests**: Startup time, large datasets
-- **Platform tests**: Verify each platform build
-
-### Performance Budgets
-- **Cold start**: < 200ms on desktop, < 500ms on mobile
-- **First render**: < 100ms
-- **Task creation**: < 50ms
-- **Sync operation**: < 2s for typical dataset (< 1000 tasks)
-- **Memory usage**: < 50MB on mobile, < 100MB on desktop
-
-### Version Scheme
-Semantic versioning: `0.1.0 → 1.0.0`
-
-### CI/CD
-GitHub Actions for all platforms
 
 ---
 
