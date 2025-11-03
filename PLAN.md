@@ -739,12 +739,12 @@ mod android {
 - [ ] Easy onboarding for Google Tasks users
 
 #### Advanced Task Management
-- [ ] **Repeating tasks** (tasks that automatically uncomplete and reschedule)
+- [ ] **Recurring tasks** (tasks that automatically uncomplete and reschedule)
   - When completed, task automatically returns to backlog
   - Due date updates by specified interval (e.g., +1 day, +1 week, +1 month)
   - Intervals: daily, weekly, monthly, yearly, custom (e.g., "every 3 days")
   - Optional: limit number of repetitions or end date
-  - Stored in frontmatter: `repeat: "daily"`, `repeat_until: "2026-01-01"`
+  - Stored in frontmatter: `recurs: "daily"`, `recurs_until: "2026-01-01"`
 - [ ] Task templates (save common tasks)
 - [ ] Bulk operations (select multiple, bulk edit)
 - [ ] Full-text search across all tasks
