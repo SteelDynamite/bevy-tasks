@@ -71,8 +71,6 @@ Task description and notes go here in **markdown** format.
 - Links, etc.
 ```
 
-**Note**: No `position` field in frontmatter - task ordering is stored in the list's `.listdata.json` file. This means reordering tasks only requires updating one file.
-
 **TaskStatus values**:
 - `backlog` - Task not yet completed
 - `completed` - Task is done
@@ -82,7 +80,7 @@ Task description and notes go here in **markdown** format.
 Task {
     id: Uuid,
     title: String,              // Derived from filename
-    notes: String,              // Markdown content
+    description: String,              // Markdown content
     status: TaskStatus,         // Backlog or Completed
     due_date: Option<DateTime>,
     created_at: DateTime,
@@ -106,7 +104,7 @@ TaskList {
 
 enum SortOrder {
     Manual,      // Use task_order from .listdata.json
-    ByDueDate,   // Sort by due_date field (tasks without due dates at end)
+    ByDueDate,   // Group by due_date, then sort by task_order within groups
 }
 
 AppConfig {
