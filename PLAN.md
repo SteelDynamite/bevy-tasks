@@ -57,7 +57,7 @@ Tasks are stored as individual `.md` files with YAML frontmatter:
 ```markdown
 ---
 id: 550e8400-e29b-41d4-a716-446655440000
-status: in-progress
+status: backlog
 due: 2025-11-15T14:00:00Z
 created: 2025-10-26T10:00:00Z
 updated: 2025-10-26T12:30:00Z
@@ -73,18 +73,26 @@ Task description and notes go here in **markdown** format.
 
 **Note**: No `position` field in frontmatter - task ordering is stored in the list's `.listdata.json` file. This means reordering tasks only requires updating one file.
 
+**TaskStatus values**:
+- `backlog` - Task not yet completed
+- `completed` - Task is done
+
 **In-Memory Model**:
 ```rust
 Task {
     id: Uuid,
     title: String,              // Derived from filename
     notes: String,              // Markdown content
-    status: TaskStatus,         // From frontmatter
-    due_date: Option<DateTime>, // From frontmatter
+    status: TaskStatus,         // Backlog or Completed
+    due_date: Option<DateTime>,
     created_at: DateTime,
     updated_at: DateTime,
     parent_id: Option<Uuid>,    // For subtasks
-    // Note: position stored in .listdata.json, not in frontmatter
+}
+
+enum TaskStatus {
+    Backlog,     // Not yet completed
+    Completed,   // Done
 }
 
 TaskList {
@@ -102,8 +110,7 @@ enum SortOrder {
 }
 
 AppConfig {
-    local_path: PathBuf,             // User-selected tasks folder (required)
-    // Note: theme and UI preferences added in Phase 3 (GUI)
+    local_path: PathBuf,
 }
 ```
 
@@ -115,9 +122,7 @@ AppConfig {
 ├── My Tasks/                # Task list folder
 │   ├── .listdata.json       # List metadata: task order, id, timestamps
 │   ├── Buy groceries.md
-│   ├── Call dentist.md
-│   └── Project X/           # Subtask folder (optional)
-│       └── Design mockup.md
+│   └── Call dentist.md
 └── Work/                    # Another task list
     ├── .listdata.json
     ├── Review PRs.md
