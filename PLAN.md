@@ -155,14 +155,7 @@ AppConfig {
 - `"manual"` - Tasks ordered by hand (uses `task_order` array)
 - `"by_due_date"` - Tasks automatically sorted by due date (tasks without due dates appear at end)
 
-When `sort_order` is `"manual"`, the `task_order` array defines the sequence. When `sort_order` is `"by_due_date"`, tasks are sorted dynamically and `task_order` is ignored.
-
-**Benefits**:
-- **Two sort modes**: Manual ordering or automatic by due date
-- **Ordering in list metadata**: Changing manual order only touches `.listdata.json`
-- **Portable lists**: Copy/move a list folder and its metadata stays with it
-- **Clean structure**: No nested hidden folders, just hidden files
-- **WebDAV-friendly**: Syncing a list syncs its metadata naturally
+When `sort_order` is `"manual"`, the `task_order` array defines the sequence. When `sort_order` is `"by_due_date"`, tasks are grouped first and then sorted within each group by `task_order`.
 
 **App Configuration** (separate from task data):
 - Windows: `%APPDATA%/bevy-tasks/config.json`
