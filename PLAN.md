@@ -283,25 +283,64 @@ tokio = { workspace = true }
 
 ```bash
 # First run: initialize tasks folder
-bevy-tasks init ~/Documents/Tasks
+$ bevy-tasks init ~/Documents/Tasks
+✓ Initialized tasks folder at ~/Documents/Tasks
+✓ Created default list "My Tasks"
 
 # Or use a cloud-synced folder
-bevy-tasks init ~/Dropbox/Tasks
+$ bevy-tasks init ~/Dropbox/Tasks
+✓ Initialized tasks folder at ~/Dropbox/Tasks
+✓ Created default list "My Tasks"
 
-# Then use normally
-bevy-tasks add "Buy groceries" --list "Personal"
-bevy-tasks list
-bevy-tasks list --list "Work"
-bevy-tasks complete <task-id>
-bevy-tasks edit <task-id>
-bevy-tasks delete <task-id>
+# Add tasks
+$ bevy-tasks add "Buy groceries" --list "Personal"
+✓ Created task "Buy groceries" (550e8400-e29b-41d4-a716-446655440000)
+
+$ bevy-tasks add "Review PR #123" --list "Work" --due "2025-11-15"
+✓ Created task "Review PR #123" (7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c)
+  Due: 2025-11-15
+
+# List all tasks
+$ bevy-tasks list
+My Tasks (3 tasks)
+  [ ] Buy groceries
+  [ ] Call dentist
+  [✓] Pay bills
+
+Work (2 tasks)
+  [ ] Review PR #123 (due: 2025-11-15)
+  [ ] Team meeting prep
+
+# List tasks in specific list
+$ bevy-tasks list --list "Work"
+Work (2 tasks)
+  [ ] Review PR #123 (due: 2025-11-15)
+  [ ] Team meeting prep
+
+# Complete a task
+$ bevy-tasks complete 550e8400-e29b-41d4-a716-446655440000
+✓ Completed task "Buy groceries"
+
+# Edit a task
+$ bevy-tasks edit 7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c
+# Opens editor with task file
+✓ Updated task "Review PR #123"
+
+# Delete a task
+$ bevy-tasks delete 550e8400-e29b-41d4-a716-446655440000
+✓ Deleted task "Buy groceries"
 
 # Change folder location later
-bevy-tasks config set-folder ~/new/location
+$ bevy-tasks config set-folder ~/new/location
+✓ Updated tasks folder location to ~/new/location
+✓ Migrated 15 tasks from ~/Documents/Tasks
 
 # Sort order
-bevy-tasks sort manual --list "Work"
-bevy-tasks sort by-due-date --list "Personal"
+$ bevy-tasks sort manual --list "Work"
+✓ Set sort order to "manual" for list "Work"
+
+$ bevy-tasks sort by-due-date --list "Personal"
+✓ Set sort order to "by due date" for list "Personal"
 ```
 
 ### Deliverables
@@ -399,15 +438,43 @@ keyring = "3.0"
 
 ```bash
 # Setup WebDAV
-bevy-tasks sync --setup
-# Prompts for: URL, username, password (stored in keychain)
+$ bevy-tasks sync --setup
+WebDAV URL: https://nextcloud.example.com/remote.php/dav/files/username/Tasks
+Username: myuser
+Password: ********
+✓ WebDAV credentials saved to system keychain
+✓ Connection verified
 
-# Manual sync
-bevy-tasks sync --push
-bevy-tasks sync --pull
+# Push local changes to WebDAV server
+$ bevy-tasks sync --push
+Syncing to https://nextcloud.example.com/...
+  Uploading My Tasks/.listdata.json
+  Uploading My Tasks/Buy groceries.md
+  Uploading Work/Review PR #123.md
+✓ Pushed 3 files to WebDAV server
+
+# Pull changes from WebDAV server
+$ bevy-tasks sync --pull
+Syncing from https://nextcloud.example.com/...
+  Downloading Work/Team meeting notes.md
+  Downloading Personal/Call mom.md
+✓ Pulled 2 files from WebDAV server
+
+# Automatic two-way sync
+$ bevy-tasks sync
+Syncing with https://nextcloud.example.com/...
+  ↑ Uploading My Tasks/New task.md
+  ↓ Downloading Work/Updated task.md
+  = No changes for 15 files
+✓ Sync complete
 
 # Check sync status
-bevy-tasks sync --status
+$ bevy-tasks sync --status
+WebDAV Server: https://nextcloud.example.com/remote.php/dav/files/username/Tasks
+Status: Connected
+Last sync: 2025-10-27 14:32:15
+Local changes: 2 files modified
+Remote changes: 0 files modified
 ```
 
 ### Deliverables
