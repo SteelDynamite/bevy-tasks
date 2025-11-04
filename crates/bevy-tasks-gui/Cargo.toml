@@ -1,0 +1,8 @@
+[package]
+name = "bevy-tasks-gui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy-tasks-core = { path = "../bevy-tasks-core" }
+# GUI dependencies will be added in Phase 3
