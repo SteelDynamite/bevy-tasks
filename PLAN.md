@@ -97,15 +97,10 @@ enum TaskStatus {
 TaskList {
     id: Uuid,
     title: String,              // Derived from folder name
-    tasks: Vec<Task>,           // Ordered according to sort_order preference
+    tasks: Vec<Task>,           // Ordered by task_order, optionally grouped by due date
     created_at: DateTime,
     updated_at: DateTime,
-    sort_order: SortOrder,      // How to sort: Manual or ByDueDate
-}
-
-enum SortOrder {
-    Manual,      // Use task_order from .listdata.json
-    ByDueDate,   // Group by due_date, then sort by task_order within groups
+    group_by_due_date: bool,    // If true, group by due date before applying task_order
 }
 
 AppConfig {
@@ -148,7 +143,7 @@ WorkspaceConfig {
   "id": "list-uuid-1",
   "created_at": "2025-10-26T10:00:00Z",
   "updated_at": "2025-10-27T14:30:00Z",
-  "sort_order": "manual",
+  "group_by_due_date": false,
   "task_order": [
     "task-uuid-1",
     "task-uuid-2",
@@ -157,11 +152,10 @@ WorkspaceConfig {
 }
 ```
 
-**Sort Order Options**:
-- `"manual"` - Tasks ordered by hand (uses `task_order` array)
-- `"by_due_date"` - Tasks automatically sorted by due date (tasks without due dates appear at end)
-
-When `sort_order` is `"manual"`, the `task_order` array defines the sequence. When `sort_order` is `"by_due_date"`, tasks are grouped first and then sorted within each group by `task_order`.
+**Task Ordering**:
+- Tasks are always ordered according to the `task_order` array (manual ordering)
+- When `group_by_due_date` is `true`, tasks are first grouped by their due date, then sorted within each group by `task_order`
+- Tasks without due dates appear at the end when grouping is enabled
 
 **App Configuration** (separate from task data, supports multiple workspaces):
 - Windows: `%APPDATA%/bevy-tasks/config.json`
@@ -209,9 +203,9 @@ impl TaskRepository {
     pub fn reorder_task(&mut self, list_id: Uuid, task_id: Uuid, new_position: usize) -> Result<()>;
     pub fn get_task_order(&self, list_id: Uuid) -> Result<Vec<Uuid>>;
 
-    // Sort preference (modifies .listdata.json)
-    pub fn set_sort_order(&mut self, list_id: Uuid, sort_order: SortOrder) -> Result<()>;
-    pub fn get_sort_order(&self, list_id: Uuid) -> Result<SortOrder>;
+    // Grouping preference (modifies .listdata.json)
+    pub fn set_group_by_due_date(&mut self, list_id: Uuid, enabled: bool) -> Result<()>;
+    pub fn get_group_by_due_date(&self, list_id: Uuid) -> Result<bool>;
 }
 
 pub trait Storage {
@@ -295,13 +289,15 @@ tokio = { workspace = true }
 - [ ] CLI: `workspace list` command (view all workspaces)
 - [ ] CLI: `workspace switch` command (change current workspace)
 - [ ] CLI: `workspace remove` command (delete workspace)
+- [ ] CLI: `workspace retarget` command (update workspace path without moving files)
+- [ ] CLI: `workspace migrate` command (move files to new location)
 - [ ] CLI: `add` command (create tasks)
 - [ ] CLI: `list` command (view tasks)
 - [ ] CLI: `complete` command (mark done)
 - [ ] CLI: `delete` command (remove tasks)
-- [ ] CLI: `edit` command (modify tasks)
-- [ ] Two sort modes: manual ordering and by due date
-- [ ] CLI: `sort` command (switch between manual/by-due-date)
+- [ ] CLI: `edit` command (modify tasks - CLI only, creates temp file)
+- [ ] Manual task ordering (always via task_order array)
+- [ ] CLI: `group` command (toggle group-by-due-date for a list)
 - [ ] Support for `--workspace` flag on all commands
 - [ ] Comprehensive unit and integration tests (>80% coverage)
 
@@ -367,27 +363,43 @@ Work (2 tasks)
 $ bevy-tasks complete 550e8400-e29b-41d4-a716-446655440000
 ✓ Completed task "Buy groceries"
 
-# Edit a task (opens in $EDITOR)
+# Edit a task (CLI-only: creates temp file, opens $EDITOR, blocks until editor exits, then parses)
 $ bevy-tasks edit 7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c
-# Opens editor with task file
+# Opens editor with task markdown file
+# User edits and saves, then exits editor
 ✓ Updated task "Review PR #123"
 
 # Delete a task
 $ bevy-tasks delete 550e8400-e29b-41d4-a716-446655440000
 ✓ Deleted task "Buy groceries"
 
+# Retarget workspace (files already at new location, just update config)
+$ bevy-tasks workspace retarget personal ~/new/path/to/Tasks
+✓ Workspace "personal" now points to ~/new/path/to/Tasks
+
+# Migrate workspace (move files to new location)
+$ bevy-tasks workspace migrate personal ~/Dropbox/Tasks
+⚠ This will move all files from ~/Documents/Tasks to ~/Dropbox/Tasks
+Continue? (y/n): y
+Moving files...
+  Moved .metadata.json
+  Moved My Tasks/ (15 files)
+  Moved Work/ (8 files)
+✓ Migrated 23 files to ~/Dropbox/Tasks
+✓ Workspace "personal" now points to ~/Dropbox/Tasks
+
 # Remove a workspace
 $ bevy-tasks workspace remove shared
-⚠ Warning: This will delete all tasks in workspace "shared"
+⚠ Warning: This will delete workspace config (files remain on disk)
 Continue? (y/n): y
 ✓ Removed workspace "shared"
 
-# Sort order
-$ bevy-tasks sort manual --list "Work"
-✓ Set sort order to "manual" for list "Work"
+# Toggle grouping by due date (tasks always use manual task_order within groups)
+$ bevy-tasks group enable --list "Work"
+✓ Enabled group-by-due-date for list "Work"
 
-$ bevy-tasks sort by-due-date --list "Personal"
-✓ Set sort order to "by due date" for list "Personal"
+$ bevy-tasks group disable --list "Personal"
+✓ Disabled group-by-due-date for list "Personal"
 ```
 
 ### Deliverables
