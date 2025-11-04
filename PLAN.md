@@ -80,7 +80,7 @@ Task description and notes go here in **markdown** format.
 ```rust
 Task {
     id: Uuid,
-    title: String,              // Derived from filename
+    title: String,              // Derived from filename (without .md extension)
     description: String,              // Markdown content
     status: TaskStatus,         // Backlog or Completed
     due_date: Option<DateTime>,
@@ -120,13 +120,15 @@ WorkspaceConfig {
 ├── .metadata.json           # Global: list ordering, last opened list
 ├── My Tasks/                # Task list folder
 │   ├── .listdata.json       # List metadata: task order, id, timestamps
-│   ├── Buy groceries.md
-│   └── Call dentist.md
+│   ├── Buy groceries.md     # Title: "Buy groceries" (without .md)
+│   └── Call dentist.md      # Title: "Call dentist" (without .md)
 └── Work/                    # Another task list
     ├── .listdata.json
-    ├── Review PRs.md
-    └── Team meeting prep.md
+    ├── Review PRs.md        # Title: "Review PRs" (without .md)
+    └── Team meeting prep.md # Title: "Team meeting prep" (without .md)
 ```
+
+**Note**: Task titles are derived from filenames by removing the `.md` extension.
 
 **`.metadata.json` (root level)**:
 ```json
@@ -291,8 +293,9 @@ tokio = { workspace = true }
 - [ ] CLI: `workspace remove` command (delete workspace)
 - [ ] CLI: `workspace retarget` command (update workspace path without moving files)
 - [ ] CLI: `workspace migrate` command (move files to new location)
-- [ ] CLI: `add` command (create tasks)
+- [ ] CLI: `list create` command (create new task lists)
 - [ ] CLI: `list` command (view tasks)
+- [ ] CLI: `add` command (create tasks)
 - [ ] CLI: `complete` command (mark done)
 - [ ] CLI: `delete` command (remove tasks)
 - [ ] CLI: `edit` command (modify tasks - CLI only, creates temp file)
@@ -323,6 +326,13 @@ $ bevy-tasks workspace list
 # Switch between workspaces
 $ bevy-tasks workspace switch shared
 ✓ Switched to workspace "shared"
+
+# Create a new task list
+$ bevy-tasks list create "Work"
+✓ Created list "Work"
+
+$ bevy-tasks list create "Personal Projects"
+✓ Created list "Personal Projects"
 
 # Add tasks (uses current workspace by default)
 $ bevy-tasks add "Buy groceries"
@@ -404,11 +414,11 @@ $ bevy-tasks group disable --list "Personal"
 
 ### Deliverables
 
-- ✅ `bevy-tasks-core` library with stable API
-- ✅ Functional CLI that can manage tasks
-- ✅ Data persists as Obsidian-compatible .md files
-- ✅ Well-tested backend (>80% coverage)
-- ✅ Documentation for core library API
+- [ ] `bevy-tasks-core` library with stable API
+- [ ] Functional CLI that can manage tasks
+- [ ] Data persists as Obsidian-compatible .md files
+- [ ] Well-tested backend (>80% coverage)
+- [ ] Documentation for core library API
 
 ### Development Setup
 
@@ -569,10 +579,10 @@ Workspace: shared
 
 ### Deliverables
 
-- ✅ Working WebDAV sync in backend
-- ✅ CLI can sync with remote WebDAV server
-- ✅ Reliable conflict resolution
-- ✅ Tested with Nextcloud, ownCloud
+- [ ] Working WebDAV sync in backend
+- [ ] CLI can sync with remote WebDAV server
+- [ ] Reliable conflict resolution
+- [ ] Tested with Nextcloud, ownCloud
 
 ---
 
@@ -706,10 +716,10 @@ egui = "0.31"    # Core egui library
 
 ### Deliverables
 
-- ✅ Functional desktop GUI app
-- ✅ Sub-200ms startup time
-- ✅ Clean, minimal UI
-- ✅ Feature parity with CLI
+- [ ] Functional desktop GUI app
+- [ ] Sub-200ms startup time
+- [ ] Clean, minimal UI
+- [ ] Feature parity with CLI
 
 ### Build & Release
 
@@ -791,11 +801,11 @@ mod android {
 
 ### Deliverables
 
-- ✅ App launches on iOS
-- ✅ App launches on Android
-- ✅ Can create and view tasks on mobile
-- ✅ Validates cross-platform architecture
-- ✅ Foundation for future mobile polish
+- [ ] App launches on iOS
+- [ ] App launches on Android
+- [ ] Can create and view tasks on mobile
+- [ ] Validates cross-platform architecture
+- [ ] Foundation for future mobile polish
 
 ### Distribution
 
@@ -836,10 +846,10 @@ mod android {
 
 ### Deliverables
 
-- ✅ Full-featured task manager on all platforms
-- ✅ Polished UX on desktop
-- ✅ Touch-optimized UX on mobile
-- ✅ Consistent feature set across platforms
+- [ ] Full-featured task manager on all platforms
+- [ ] Polished UX on desktop
+- [ ] Touch-optimized UX on mobile
+- [ ] Consistent feature set across platforms
 
 ---
 
@@ -876,9 +886,9 @@ mod android {
 
 ### Deliverables
 
-- ✅ Native-feeling mobile apps
-- ✅ Deep platform integration
-- ✅ Mobile-specific features
+- [ ] Native-feeling mobile apps
+- [ ] Deep platform integration
+- [ ] Mobile-specific features
 
 ### Distribution
 
@@ -945,10 +955,10 @@ If you want game-like polish after Phase 7:
 
 ### Deliverables
 
-- ✅ Polished, delightful UX
-- ✅ Unique features not in Google Tasks
-- ✅ Easy migration path from Google Tasks
-- ✅ Distribution to all app stores
+- [ ] Polished, delightful UX
+- [ ] Unique features not in Google Tasks
+- [ ] Easy migration path from Google Tasks
+- [ ] Distribution to all app stores
 
 ### Final Distribution
 
