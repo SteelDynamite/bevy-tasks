@@ -8,10 +8,11 @@ A **local-first, cross-platform tasks application** inspired by Google Tasks. Bu
 - **Local-First**: Your data, your folder, your control
 - **Fast**: Sub-second startup, instant response
 - **Cross-Platform**: Single codebase, all platforms
+- **Flexible**: Multiple workspaces for different contexts (personal, shared, work, etc.)
 
 **Data Format**: Tasks stored as markdown files with YAML frontmatter (Obsidian-compatible)
-**Storage**: User selects folder location (e.g., `~/Documents/Tasks`, `~/Dropbox/Tasks`)
-**Sync**: Optional WebDAV for cross-device synchronization
+**Storage**: User selects folder location for each workspace (e.g., `~/Documents/Tasks`, `~/Dropbox/TeamTasks`)
+**Sync**: Optional per-workspace WebDAV for cross-device synchronization
 **Architecture**: Backend/frontend separation with CLI-first development
 
 ---
@@ -96,19 +97,19 @@ enum TaskStatus {
 TaskList {
     id: Uuid,
     title: String,              // Derived from folder name
-    tasks: Vec<Task>,           // Ordered according to sort_order preference
+    tasks: Vec<Task>,           // Ordered by task_order, optionally grouped by due date
     created_at: DateTime,
     updated_at: DateTime,
-    sort_order: SortOrder,      // How to sort: Manual or ByDueDate
-}
-
-enum SortOrder {
-    Manual,      // Use task_order from .listdata.json
-    ByDueDate,   // Group by due_date, then sort by task_order within groups
+    group_by_due_date: bool,    // If true, group by due date before applying task_order
 }
 
 AppConfig {
-    local_path: PathBuf,
+    workspaces: HashMap<String, WorkspaceConfig>,
+    current_workspace: Option<String>,
+}
+
+WorkspaceConfig {
+    path: PathBuf,
 }
 ```
 
@@ -142,7 +143,7 @@ AppConfig {
   "id": "list-uuid-1",
   "created_at": "2025-10-26T10:00:00Z",
   "updated_at": "2025-10-27T14:30:00Z",
-  "sort_order": "manual",
+  "group_by_due_date": false,
   "task_order": [
     "task-uuid-1",
     "task-uuid-2",
@@ -151,16 +152,29 @@ AppConfig {
 }
 ```
 
-**Sort Order Options**:
-- `"manual"` - Tasks ordered by hand (uses `task_order` array)
-- `"by_due_date"` - Tasks automatically sorted by due date (tasks without due dates appear at end)
+**Task Ordering**:
+- Tasks are always ordered according to the `task_order` array (manual ordering)
+- When `group_by_due_date` is `true`, tasks are first grouped by their due date, then sorted within each group by `task_order`
+- Tasks without due dates appear at the end when grouping is enabled
 
-When `sort_order` is `"manual"`, the `task_order` array defines the sequence. When `sort_order` is `"by_due_date"`, tasks are grouped first and then sorted within each group by `task_order`.
-
-**App Configuration** (separate from task data):
+**App Configuration** (separate from task data, supports multiple workspaces):
 - Windows: `%APPDATA%/bevy-tasks/config.json`
 - Linux: `~/.config/bevy-tasks/config.json`
 - macOS: `~/Library/Application Support/bevy-tasks/config.json`
+
+```json
+{
+  "workspaces": {
+    "personal": {
+      "path": "/home/user/Documents/Tasks"
+    },
+    "shared": {
+      "path": "/home/user/Dropbox/TeamTasks"
+    }
+  },
+  "current_workspace": "personal"
+}
+```
 
 #### Core Library API
 
@@ -189,9 +203,9 @@ impl TaskRepository {
     pub fn reorder_task(&mut self, list_id: Uuid, task_id: Uuid, new_position: usize) -> Result<()>;
     pub fn get_task_order(&self, list_id: Uuid) -> Result<Vec<Uuid>>;
 
-    // Sort preference (modifies .listdata.json)
-    pub fn set_sort_order(&mut self, list_id: Uuid, sort_order: SortOrder) -> Result<()>;
-    pub fn get_sort_order(&self, list_id: Uuid) -> Result<SortOrder>;
+    // Grouping preference (modifies .listdata.json)
+    pub fn set_group_by_due_date(&mut self, list_id: Uuid, enabled: bool) -> Result<()>;
+    pub fn get_group_by_due_date(&self, list_id: Uuid) -> Result<bool>;
 }
 
 pub trait Storage {
@@ -265,42 +279,64 @@ tokio = { workspace = true }
 ### Features
 
 - [ ] Cargo workspace setup
-- [ ] Data models (Task, TaskList, AppConfig)
+- [ ] Data models (Task, TaskList, AppConfig, WorkspaceConfig)
 - [ ] Markdown file I/O with YAML frontmatter parsing
 - [ ] Local storage implementation
 - [ ] Repository pattern and public API
-- [ ] CLI: `init` command (user selects folder)
+- [ ] Multiple workspace support
+- [ ] CLI: `init` command (create named workspace)
+- [ ] CLI: `workspace add` command (add additional workspaces)
+- [ ] CLI: `workspace list` command (view all workspaces)
+- [ ] CLI: `workspace switch` command (change current workspace)
+- [ ] CLI: `workspace remove` command (delete workspace)
+- [ ] CLI: `workspace retarget` command (update workspace path without moving files)
+- [ ] CLI: `workspace migrate` command (move files to new location)
 - [ ] CLI: `add` command (create tasks)
 - [ ] CLI: `list` command (view tasks)
 - [ ] CLI: `complete` command (mark done)
 - [ ] CLI: `delete` command (remove tasks)
-- [ ] CLI: `edit` command (modify tasks)
-- [ ] Two sort modes: manual ordering and by due date
-- [ ] CLI: `sort` command (switch between manual/by-due-date)
+- [ ] CLI: `edit` command (modify tasks - CLI only, creates temp file)
+- [ ] Manual task ordering (always via task_order array)
+- [ ] CLI: `group` command (toggle group-by-due-date for a list)
+- [ ] Support for `--workspace` flag on all commands
 - [ ] Comprehensive unit and integration tests (>80% coverage)
 
 ### CLI Usage Examples
 
 ```bash
-# First run: initialize tasks folder
-$ bevy-tasks init ~/Documents/Tasks
-✓ Initialized tasks folder at ~/Documents/Tasks
+# First run: initialize a workspace (creates named workspace)
+$ bevy-tasks init ~/Documents/Tasks --name personal
+✓ Initialized workspace "personal" at ~/Documents/Tasks
+✓ Created default list "My Tasks"
+✓ Set "personal" as current workspace
+
+# Add more workspaces (e.g., for shared/collaborative tasks)
+$ bevy-tasks workspace add shared ~/Dropbox/TeamTasks
+✓ Added workspace "shared" at ~/Dropbox/TeamTasks
 ✓ Created default list "My Tasks"
 
-# Or use a cloud-synced folder
-$ bevy-tasks init ~/Dropbox/Tasks
-✓ Initialized tasks folder at ~/Dropbox/Tasks
-✓ Created default list "My Tasks"
+# List all workspaces
+$ bevy-tasks workspace list
+  personal: ~/Documents/Tasks (current)
+  shared: ~/Dropbox/TeamTasks
 
-# Add tasks
-$ bevy-tasks add "Buy groceries" --list "Personal"
+# Switch between workspaces
+$ bevy-tasks workspace switch shared
+✓ Switched to workspace "shared"
+
+# Add tasks (uses current workspace by default)
+$ bevy-tasks add "Buy groceries"
 ✓ Created task "Buy groceries" (550e8400-e29b-41d4-a716-446655440000)
 
 $ bevy-tasks add "Review PR #123" --list "Work" --due "2025-11-15"
 ✓ Created task "Review PR #123" (7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c)
   Due: 2025-11-15
 
-# List all tasks
+# Or specify workspace explicitly
+$ bevy-tasks add "Team meeting" --workspace shared
+✓ Created task "Team meeting" in workspace "shared"
+
+# List all tasks (from current workspace)
 $ bevy-tasks list
 My Tasks (3 tasks)
   [ ] Buy groceries
@@ -310,6 +346,12 @@ My Tasks (3 tasks)
 Work (2 tasks)
   [ ] Review PR #123 (due: 2025-11-15)
   [ ] Team meeting prep
+
+# List tasks from specific workspace
+$ bevy-tasks list --workspace shared
+Shared Tasks (2 tasks)
+  [ ] Team meeting
+  [ ] Quarterly planning
 
 # List tasks in specific list
 $ bevy-tasks list --list "Work"
@@ -321,26 +363,43 @@ Work (2 tasks)
 $ bevy-tasks complete 550e8400-e29b-41d4-a716-446655440000
 ✓ Completed task "Buy groceries"
 
-# Edit a task
+# Edit a task (CLI-only: creates temp file, opens $EDITOR, blocks until editor exits, then parses)
 $ bevy-tasks edit 7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c
-# Opens editor with task file
+# Opens editor with task markdown file
+# User edits and saves, then exits editor
 ✓ Updated task "Review PR #123"
 
 # Delete a task
 $ bevy-tasks delete 550e8400-e29b-41d4-a716-446655440000
 ✓ Deleted task "Buy groceries"
 
-# Change folder location later
-$ bevy-tasks config set-folder ~/new/location
-✓ Updated tasks folder location to ~/new/location
-✓ Migrated 15 tasks from ~/Documents/Tasks
+# Retarget workspace (files already at new location, just update config)
+$ bevy-tasks workspace retarget personal ~/new/path/to/Tasks
+✓ Workspace "personal" now points to ~/new/path/to/Tasks
 
-# Sort order
-$ bevy-tasks sort manual --list "Work"
-✓ Set sort order to "manual" for list "Work"
+# Migrate workspace (move files to new location)
+$ bevy-tasks workspace migrate personal ~/Dropbox/Tasks
+⚠ This will move all files from ~/Documents/Tasks to ~/Dropbox/Tasks
+Continue? (y/n): y
+Moving files...
+  Moved .metadata.json
+  Moved My Tasks/ (15 files)
+  Moved Work/ (8 files)
+✓ Migrated 23 files to ~/Dropbox/Tasks
+✓ Workspace "personal" now points to ~/Dropbox/Tasks
 
-$ bevy-tasks sort by-due-date --list "Personal"
-✓ Set sort order to "by due date" for list "Personal"
+# Remove a workspace
+$ bevy-tasks workspace remove shared
+⚠ Warning: This will delete workspace config (files remain on disk)
+Continue? (y/n): y
+✓ Removed workspace "shared"
+
+# Toggle grouping by due date (tasks always use manual task_order within groups)
+$ bevy-tasks group enable --list "Work"
+✓ Enabled group-by-due-date for list "Work"
+
+$ bevy-tasks group disable --list "Personal"
+✓ Disabled group-by-due-date for list "Personal"
 ```
 
 ### Deliverables
@@ -363,9 +422,10 @@ cargo build
 cargo test -p bevy-tasks-core
 
 # Run CLI
-cargo run -p bevy-tasks-cli -- init ~/test-tasks
+cargo run -p bevy-tasks-cli -- init ~/test-tasks --name test
 cargo run -p bevy-tasks-cli -- add "Test task"
 cargo run -p bevy-tasks-cli -- list
+cargo run -p bevy-tasks-cli -- workspace list
 ```
 
 ---
@@ -381,13 +441,17 @@ cargo run -p bevy-tasks-cli -- list
 Add WebDAV support to `bevy-tasks-core`:
 
 ```rust
-// Update AppConfig
-AppConfig {
-    local_path: PathBuf,             // User-selected tasks folder (required)
+// Update WorkspaceConfig to include WebDAV
+WorkspaceConfig {
+    path: PathBuf,
     webdav_url: Option<String>,
-    webdav_credentials: Option<Credentials>,
     last_sync: Option<DateTime>,
-    // Note: list_order and last_opened_list in .metadata.json at root of tasks folder
+}
+
+// AppConfig remains the same (workspaces + current_workspace)
+AppConfig {
+    workspaces: HashMap<String, WorkspaceConfig>,
+    current_workspace: Option<String>,
 }
 
 // Add sync methods to TaskRepository
@@ -437,17 +501,25 @@ keyring = "3.0"
 ### CLI Usage Examples
 
 ```bash
-# Setup WebDAV
+# Setup WebDAV for current workspace
 $ bevy-tasks sync --setup
 WebDAV URL: https://nextcloud.example.com/remote.php/dav/files/username/Tasks
 Username: myuser
 Password: ********
 ✓ WebDAV credentials saved to system keychain
-✓ Connection verified
+✓ Connection verified for workspace "personal"
 
-# Push local changes to WebDAV server
+# Setup WebDAV for specific workspace
+$ bevy-tasks sync --setup --workspace shared
+WebDAV URL: https://nextcloud.example.com/remote.php/dav/files/username/SharedTasks
+Username: myuser
+Password: ********
+✓ WebDAV credentials saved to system keychain
+✓ Connection verified for workspace "shared"
+
+# Push local changes to WebDAV server (current workspace)
 $ bevy-tasks sync --push
-Syncing to https://nextcloud.example.com/...
+Syncing workspace "personal" to https://nextcloud.example.com/...
   Uploading My Tasks/.listdata.json
   Uploading My Tasks/Buy groceries.md
   Uploading Work/Review PR #123.md
@@ -455,26 +527,44 @@ Syncing to https://nextcloud.example.com/...
 
 # Pull changes from WebDAV server
 $ bevy-tasks sync --pull
-Syncing from https://nextcloud.example.com/...
+Syncing workspace "personal" from https://nextcloud.example.com/...
   Downloading Work/Team meeting notes.md
   Downloading Personal/Call mom.md
 ✓ Pulled 2 files from WebDAV server
 
 # Automatic two-way sync
 $ bevy-tasks sync
-Syncing with https://nextcloud.example.com/...
+Syncing workspace "personal" with https://nextcloud.example.com/...
   ↑ Uploading My Tasks/New task.md
   ↓ Downloading Work/Updated task.md
   = No changes for 15 files
 ✓ Sync complete
 
-# Check sync status
+# Sync specific workspace
+$ bevy-tasks sync --workspace shared
+Syncing workspace "shared" with https://nextcloud.example.com/...
+✓ Sync complete (no changes)
+
+# Check sync status for current workspace
 $ bevy-tasks sync --status
+Workspace: personal
 WebDAV Server: https://nextcloud.example.com/remote.php/dav/files/username/Tasks
 Status: Connected
 Last sync: 2025-10-27 14:32:15
 Local changes: 2 files modified
 Remote changes: 0 files modified
+
+# Check sync status for all workspaces
+$ bevy-tasks sync --status --all
+Workspace: personal
+  WebDAV: https://nextcloud.example.com/.../Tasks
+  Status: Connected
+  Last sync: 2025-10-27 14:32:15
+
+Workspace: shared
+  WebDAV: https://nextcloud.example.com/.../SharedTasks
+  Status: Connected
+  Last sync: 2025-10-27 14:28:42
 ```
 
 ### Deliverables
@@ -532,23 +622,34 @@ crates/bevy-tasks-gui/
 ```
 
 #### First Run Experience
-- Show folder picker dialog on first launch
+- Show workspace setup dialog on first launch
+- User creates first workspace with name and folder location
 - User selects where to store tasks (e.g., `~/Documents/Tasks`)
 - No default hidden directories
-- Remember choice in app config
+- Remember workspaces in app config
+
+#### Workspace UI Elements
+- Workspace selector dropdown in toolbar
+- Quick-switch between workspaces
+- Visual indicator of current workspace
+- Settings panel to manage workspaces (add/remove/configure)
 
 #### App Configuration (Phase 3+)
 
 **Update AppConfig** to include UI preferences:
 ```rust
 AppConfig {
-    local_path: PathBuf,             // From Phase 1
-    webdav_url: Option<String>,      // From Phase 2
-    webdav_credentials: Option<Credentials>,
-    last_sync: Option<DateTime>,
+    workspaces: HashMap<String, WorkspaceConfig>,  // From Phase 1
+    current_workspace: Option<String>,
     theme: Theme,                    // NEW: light/dark mode
     window_size: Option<(u32, u32)>, // NEW: remember window size
-    last_opened_list: Option<Uuid>,  // NEW: restore last view
+    last_opened_list_per_workspace: HashMap<String, Uuid>,  // NEW: per-workspace last view
+}
+
+WorkspaceConfig {
+    path: PathBuf,
+    webdav_url: Option<String>,      // From Phase 2
+    last_sync: Option<DateTime>,
 }
 ```
 
@@ -591,14 +692,16 @@ egui = "0.31"    # Core egui library
 ### Features
 
 - [ ] egui framework integration
-- [ ] Folder picker dialog on first launch
+- [ ] Workspace setup dialog on first launch
+- [ ] Workspace selector in toolbar
+- [ ] Quick-switch between workspaces
 - [ ] Basic task list view
 - [ ] Create new tasks
 - [ ] Edit existing tasks
 - [ ] Delete tasks
 - [ ] Mark tasks complete/incomplete
-- [ ] Settings screen (change folder, WebDAV config)
-- [ ] Sync status indicators
+- [ ] Settings screen (manage workspaces, WebDAV config)
+- [ ] Sync status indicators (per workspace)
 - [ ] Desktop support (Windows, Linux, macOS)
 
 ### Deliverables
