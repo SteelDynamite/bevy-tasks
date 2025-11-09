@@ -14,3 +14,5 @@ colored = "2.0"
 anyhow = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+tokio = { workspace = true }
+rpassword = "7.3"  # Secure password input

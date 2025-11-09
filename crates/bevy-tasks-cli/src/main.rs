@@ -73,6 +73,14 @@ enum Commands {
         #[command(subcommand)]
         command: GroupCommands,
     },
+    /// WebDAV sync operations
+    Sync {
+        #[command(subcommand)]
+        command: Option<SyncCommands>,
+        /// Workspace name
+        #[arg(short, long)]
+        workspace: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -137,7 +145,24 @@ enum GroupCommands {
     },
 }
 
-fn main() -> Result<()> {
+#[derive(Subcommand)]
+enum SyncCommands {
+    /// Configure WebDAV sync for a workspace
+    Setup,
+    /// Push local changes to WebDAV server
+    Push,
+    /// Pull remote changes from WebDAV server
+    Pull,
+    /// Show sync status
+    Status {
+        /// Show status for all workspaces
+        #[arg(long)]
+        all: bool,
+    },
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -168,6 +193,13 @@ fn main() -> Result<()> {
         Commands::Group { command } => match command {
             GroupCommands::Enable { list } => commands::group::set_group(list, true),
             GroupCommands::Disable { list } => commands::group::set_group(list, false),
+        },
+        Commands::Sync { command, workspace } => match command {
+            Some(SyncCommands::Setup) => commands::sync::setup(workspace).await,
+            Some(SyncCommands::Push) => commands::sync::push(workspace).await,
+            Some(SyncCommands::Pull) => commands::sync::pull(workspace).await,
+            Some(SyncCommands::Status { all }) => commands::sync::status(workspace, all).await,
+            None => commands::sync::sync(workspace).await,
         },
     }
 }

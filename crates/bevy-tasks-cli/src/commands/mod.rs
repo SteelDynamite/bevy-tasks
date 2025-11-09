@@ -1,6 +1,7 @@
 pub mod group;
 pub mod init;
 pub mod list;
+pub mod sync;
 pub mod task;
 pub mod workspace;
 
