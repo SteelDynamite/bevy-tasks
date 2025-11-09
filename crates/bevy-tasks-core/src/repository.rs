@@ -1,26 +1,30 @@
 use crate::error::{Error, Result};
 use crate::models::{Task, TaskList};
 use crate::storage::{FileSystemStorage, Storage};
+use crate::sync::{SyncEngine, SyncResult, SyncStatus};
+use crate::webdav::WebDavClient;
 use std::path::PathBuf;
 use uuid::Uuid;
 
 /// Repository for managing tasks and lists
 pub struct TaskRepository {
     storage: Box<dyn Storage>,
+    workspace_path: PathBuf,
 }
 
 impl TaskRepository {
     /// Create a new repository with an existing tasks folder
     pub fn new(tasks_folder: PathBuf) -> Result<Self> {
-        let storage = FileSystemStorage::new(tasks_folder)?;
+        let storage = FileSystemStorage::new(tasks_folder.clone())?;
         Ok(Self {
             storage: Box::new(storage),
+            workspace_path: tasks_folder,
         })
     }
 
     /// Initialize a new tasks folder and repository
     pub fn init(tasks_folder: PathBuf) -> Result<Self> {
-        let mut storage = FileSystemStorage::new(tasks_folder)?;
+        let mut storage = FileSystemStorage::new(tasks_folder.clone())?;
         storage.init()?;
 
         // Create default list
@@ -28,6 +32,7 @@ impl TaskRepository {
 
         Ok(Self {
             storage: Box::new(storage),
+            workspace_path: tasks_folder,
         })
     }
 
@@ -253,6 +258,44 @@ impl TaskRepository {
         }
 
         Err(Error::Other(format!("List not found: {}", name)))
+    }
+
+    // Sync operations
+
+    /// Push local changes to WebDAV server
+    ///
+    /// # Arguments
+    /// * `webdav_client` - Configured WebDAV client for the workspace
+    pub async fn sync_push(&self, webdav_client: WebDavClient) -> Result<SyncResult> {
+        let engine = SyncEngine::new(self.workspace_path.clone(), webdav_client);
+        engine.push().await
+    }
+
+    /// Pull remote changes from WebDAV server
+    ///
+    /// # Arguments
+    /// * `webdav_client` - Configured WebDAV client for the workspace
+    pub async fn sync_pull(&self, webdav_client: WebDavClient) -> Result<SyncResult> {
+        let engine = SyncEngine::new(self.workspace_path.clone(), webdav_client);
+        engine.pull().await
+    }
+
+    /// Perform bidirectional sync with WebDAV server
+    ///
+    /// # Arguments
+    /// * `webdav_client` - Configured WebDAV client for the workspace
+    pub async fn sync(&self, webdav_client: WebDavClient) -> Result<SyncResult> {
+        let engine = SyncEngine::new(self.workspace_path.clone(), webdav_client);
+        engine.sync().await
+    }
+
+    /// Get sync status for this workspace
+    ///
+    /// # Arguments
+    /// * `webdav_client` - Configured WebDAV client for the workspace
+    pub async fn sync_status(&self, webdav_client: WebDavClient) -> Result<SyncStatus> {
+        let engine = SyncEngine::new(self.workspace_path.clone(), webdav_client);
+        engine.status().await
     }
 }
 

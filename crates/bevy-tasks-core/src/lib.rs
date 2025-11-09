@@ -9,6 +9,7 @@ pub mod error;
 pub mod models;
 pub mod repository;
 pub mod storage;
+pub mod sync;
 pub mod webdav;
 
 pub use config::{AppConfig, WorkspaceConfig};
@@ -17,4 +18,5 @@ pub use error::{Error, Result};
 pub use models::{Task, TaskList, TaskStatus};
 pub use repository::TaskRepository;
 pub use storage::{FileSystemStorage, Storage};
+pub use sync::{SyncEngine, SyncResult, SyncStatus};
 pub use webdav::WebDavClient;
