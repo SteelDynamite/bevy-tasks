@@ -13,6 +13,10 @@ chrono = { workspace = true }
 directories = "5.0"
 anyhow = { workspace = true }
 thiserror = "2.0"
+tokio = { workspace = true }
+reqwest_dav = "0.2"       # WebDAV client
+keyring = "3.0"           # Secure credential storage
+url = "2.5"               # URL parsing for WebDAV
 
 [dev-dependencies]
 tempfile = "3.0"

@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use chrono::{DateTime, Utc};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -9,6 +10,10 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
     pub path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webdav_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sync: Option<DateTime<Utc>>,
 }
 
 /// Application configuration supporting multiple workspaces
@@ -70,7 +75,14 @@ impl AppConfig {
             return Err(Error::WorkspaceAlreadyExists(name));
         }
 
-        self.workspaces.insert(name.clone(), WorkspaceConfig { path });
+        self.workspaces.insert(
+            name.clone(),
+            WorkspaceConfig {
+                path,
+                webdav_url: None,
+                last_sync: None,
+            },
+        );
 
         // Set as current if it's the first workspace
         if self.current_workspace.is_none() {
