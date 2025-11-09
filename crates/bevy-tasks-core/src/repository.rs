@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::models::{Task, TaskList, TaskStatus};
+use crate::models::{Task, TaskList};
 use crate::storage::{FileSystemStorage, Storage};
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -24,7 +24,7 @@ impl TaskRepository {
         storage.init()?;
 
         // Create default list
-        let list_id = storage.create_list("My Tasks")?;
+        let _list_id = storage.create_list("My Tasks")?;
 
         Ok(Self {
             storage: Box::new(storage),
@@ -34,7 +34,7 @@ impl TaskRepository {
     // Task operations
 
     /// Create a new task
-    pub fn create_task(&mut self, list_id: Uuid, mut task: Task) -> Result<Task> {
+    pub fn create_task(&mut self, list_id: Uuid, task: Task) -> Result<Task> {
         // Update task order in list metadata
         let mut metadata = self.storage.read_list_metadata(list_id)?;
         metadata.task_order.push(task.id);
@@ -125,7 +125,7 @@ impl TaskRepository {
 
     /// Create a new task list
     pub fn create_list(&mut self, name: String) -> Result<TaskList> {
-        let list_id = self.storage.create_list(&name)?;
+        let _list_id = self.storage.create_list(&name)?;
         Ok(TaskList::new(name))
     }
 
@@ -259,6 +259,7 @@ impl TaskRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::TaskStatus;
     use tempfile::TempDir;
 
     #[test]

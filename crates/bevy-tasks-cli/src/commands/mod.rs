@@ -6,11 +6,10 @@ pub mod workspace;
 
 use anyhow::Result;
 use bevy_tasks_core::{AppConfig, TaskRepository};
-use std::path::PathBuf;
 
 /// Get the current workspace repository
 pub fn get_current_repo(workspace_name: Option<String>) -> Result<TaskRepository> {
-    let mut config = AppConfig::load()?;
+    let config = AppConfig::load()?;
 
     let workspace_path = if let Some(name) = workspace_name {
         config.get_workspace(&name)?.path.clone()
@@ -19,5 +18,5 @@ pub fn get_current_repo(workspace_name: Option<String>) -> Result<TaskRepository
         workspace.path.clone()
     };
 
-    TaskRepository::new(workspace_path)
+    Ok(TaskRepository::new(workspace_path)?)
 }
