@@ -13,6 +13,9 @@ pub fn execute(path: PathBuf, name: String) -> Result<()> {
     // Add workspace
     config.add_workspace(name.clone(), path.clone())?;
 
+    // Set as current workspace
+    config.switch_workspace(&name)?;
+
     // Save config
     config.save()?;
 

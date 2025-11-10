@@ -66,6 +66,19 @@ pub fn complete(task_id_str: String, workspace: Option<String>) -> Result<()> {
     Ok(())
 }
 
+pub fn uncomplete(task_id_str: String, workspace: Option<String>) -> Result<()> {
+    let mut repo = get_current_repo(workspace)?;
+
+    let task_id = Uuid::parse_str(&task_id_str)?;
+    let (list_id, task) = repo.find_task(task_id)?;
+
+    repo.uncomplete_task(list_id, task_id)?;
+
+    println!("{} Uncompleted task \"{}\"", "✓".green(), task.title.bold());
+
+    Ok(())
+}
+
 pub fn delete(task_id_str: String, workspace: Option<String>) -> Result<()> {
     let mut repo = get_current_repo(workspace)?;
 
@@ -75,6 +88,68 @@ pub fn delete(task_id_str: String, workspace: Option<String>) -> Result<()> {
     repo.delete_task(list_id, task_id)?;
 
     println!("{} Deleted task \"{}\"", "✓".green(), task.title.bold());
+
+    Ok(())
+}
+
+pub fn clean(list_name: Option<String>, workspace: Option<String>) -> Result<()> {
+    let mut repo = get_current_repo(workspace)?;
+
+    let lists = if let Some(name) = list_name {
+        // Clean specific list
+        vec![repo.find_list_by_name(&name)?]
+    } else {
+        // Clean all lists
+        repo.get_lists()?.into_iter().map(|l| l.id).collect()
+    };
+
+    let mut total_deleted = 0;
+
+    for list_id in lists {
+        let list = repo.get_list(list_id)?;
+        let completed_tasks: Vec<_> = list
+            .tasks
+            .into_iter()
+            .filter(|t| t.status == bevy_tasks_core::TaskStatus::Completed)
+            .collect();
+
+        for task in completed_tasks {
+            repo.delete_task(list_id, task.id)?;
+            total_deleted += 1;
+        }
+    }
+
+    println!(
+        "{} Deleted {} completed task{}",
+        "✓".green(),
+        total_deleted,
+        if total_deleted == 1 { "" } else { "s" }
+    );
+
+    Ok(())
+}
+
+pub fn move_task(task_id_str: String, target_list: String, workspace: Option<String>) -> Result<()> {
+    let mut repo = get_current_repo(workspace)?;
+
+    let task_id = Uuid::parse_str(&task_id_str)?;
+    let (source_list_id, task) = repo.find_task(task_id)?;
+    let target_list_id = repo.find_list_by_name(&target_list)?;
+
+    // Check if already in target list
+    if source_list_id == target_list_id {
+        return Err(anyhow!("Task is already in list \"{}\"", target_list));
+    }
+
+    // Move task: delete from source, create in destination
+    repo.delete_task(source_list_id, task_id)?;
+    repo.create_task(target_list_id, task)?;
+
+    println!(
+        "{} Moved task to list \"{}\"",
+        "✓".green(),
+        target_list.bold()
+    );
 
     Ok(())
 }

@@ -62,6 +62,8 @@ pub struct ListMetadata {
     pub updated_at: DateTime<Utc>,
     pub group_by_due_date: bool,
     pub task_order: Vec<Uuid>,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 impl ListMetadata {
@@ -73,6 +75,7 @@ impl ListMetadata {
             updated_at: now,
             group_by_due_date: false,
             task_order: Vec::new(),
+            archived: false,
         }
     }
 }
@@ -86,6 +89,7 @@ pub struct TaskList {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub group_by_due_date: bool,
+    pub archived: bool,
 }
 
 impl TaskList {
@@ -99,6 +103,7 @@ impl TaskList {
             created_at: now,
             updated_at: now,
             group_by_due_date: false,
+            archived: false,
         }
     }
 }

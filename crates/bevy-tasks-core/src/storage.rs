@@ -33,6 +33,8 @@ pub trait Storage {
     fn create_list(&mut self, name: &str) -> Result<Uuid>;
     fn list_lists(&self) -> Result<Vec<(Uuid, String)>>;
     fn delete_list(&mut self, list_id: Uuid) -> Result<()>;
+    fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()>;
+    fn archive_list(&mut self, list_id: Uuid, archived: bool) -> Result<()>;
     fn read_global_metadata(&self) -> Result<GlobalMetadata>;
     fn write_global_metadata(&mut self, metadata: &GlobalMetadata) -> Result<()>;
     fn read_list_metadata(&self, list_id: Uuid) -> Result<ListMetadata>;
@@ -309,6 +311,35 @@ impl Storage for FileSystemStorage {
         }
         self.write_global_metadata(&global_metadata)?;
 
+        Ok(())
+    }
+
+    fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()> {
+        let old_path = self.get_list_path(list_id)?.clone();
+        let new_path = self.root_path.join(&new_name);
+
+        // Check if new name already exists
+        if new_path.exists() {
+            return Err(Error::Other(format!(
+                "A list with the name '{}' already exists",
+                new_name
+            )));
+        }
+
+        // Rename the directory
+        fs::rename(&old_path, &new_path)?;
+
+        // Update the list_paths cache
+        self.list_paths.insert(list_id, new_path);
+
+        Ok(())
+    }
+
+    fn archive_list(&mut self, list_id: Uuid, archived: bool) -> Result<()> {
+        let mut metadata = self.read_list_metadata(list_id)?;
+        metadata.archived = archived;
+        metadata.updated_at = chrono::Utc::now();
+        self.write_list_metadata(&metadata)?;
         Ok(())
     }
 

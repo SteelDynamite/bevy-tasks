@@ -95,6 +95,57 @@ pub fn remove(name: String) -> Result<()> {
     Ok(())
 }
 
+pub fn destroy(name: String) -> Result<()> {
+    let mut config = AppConfig::load()?;
+
+    // Get workspace path before removing
+    let workspace_path = config.get_workspace(&name)?.path.clone();
+
+    // Confirmation with strong warning
+    println!(
+        "{} {} This will permanently delete all files in the workspace!",
+        "⚠".red().bold(),
+        "WARNING:".red().bold()
+    );
+    println!("  Workspace: {}", name.bold());
+    println!("  Location: {}", workspace_path.display());
+    println!(
+        "\n{} This action cannot be undone!",
+        "⚠".red().bold()
+    );
+    print!("Type the workspace name to confirm: ");
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+
+    if input.trim() != name {
+        println!("Cancelled.");
+        return Ok(());
+    }
+
+    // Delete all files and directories
+    if workspace_path.exists() {
+        println!("Deleting workspace files...");
+        fs::remove_dir_all(&workspace_path)?;
+        println!("{} Deleted {}", "✓".green(), workspace_path.display());
+    } else {
+        println!("{} Workspace directory doesn't exist", "⚠".yellow());
+    }
+
+    // Remove from config
+    config.remove_workspace(&name)?;
+    config.save()?;
+
+    println!(
+        "{} Destroyed workspace \"{}\"",
+        "✓".green(),
+        name.bold()
+    );
+
+    Ok(())
+}
+
 pub fn retarget(name: String, new_path: PathBuf) -> Result<()> {
     let mut config = AppConfig::load()?;
 

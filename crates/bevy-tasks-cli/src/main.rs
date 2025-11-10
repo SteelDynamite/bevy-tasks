@@ -24,12 +24,24 @@ enum Commands {
     /// Workspace management commands
     #[command(subcommand)]
     Workspace(WorkspaceCommands),
-    /// Create a new task list
-    #[command(name = "list")]
-    ListCmd {
-        #[command(subcommand)]
-        command: Option<ListCommands>,
+    /// List tasks
+    Ls {
+        /// List name to show tasks from
+        #[arg(short, long)]
+        list: Option<String>,
+        /// Workspace name
+        #[arg(short, long)]
+        workspace: Option<String>,
+        /// Show archived lists
+        #[arg(long)]
+        show_archived: bool,
+        /// Show completed tasks (hidden by default)
+        #[arg(long)]
+        completed: bool,
     },
+    /// Manage task lists
+    #[command(subcommand)]
+    List(ListCommands),
     /// Add a new task
     Add {
         /// Task title
@@ -52,10 +64,37 @@ enum Commands {
         #[arg(short, long)]
         workspace: Option<String>,
     },
+    /// Uncomplete a task
+    Uncomplete {
+        /// Task ID
+        task_id: String,
+        /// Workspace name
+        #[arg(short, long)]
+        workspace: Option<String>,
+    },
     /// Delete a task
     Delete {
         /// Task ID
         task_id: String,
+        /// Workspace name
+        #[arg(short, long)]
+        workspace: Option<String>,
+    },
+    /// Clean completed tasks from a list
+    Clean {
+        /// List name (cleans all lists if not specified)
+        #[arg(short, long)]
+        list: Option<String>,
+        /// Workspace name
+        #[arg(short, long)]
+        workspace: Option<String>,
+    },
+    /// Move a task to a different list
+    Move {
+        /// Task ID
+        task_id: String,
+        /// Target list name
+        list: String,
         /// Workspace name
         #[arg(short, long)]
         workspace: Option<String>,
@@ -104,6 +143,11 @@ enum WorkspaceCommands {
         /// Workspace name
         name: String,
     },
+    /// Destroy a workspace (deletes all files and config)
+    Destroy {
+        /// Workspace name
+        name: String,
+    },
     /// Update workspace path (files already at new location)
     Retarget {
         /// Workspace name
@@ -126,6 +170,53 @@ enum ListCommands {
     Create {
         /// List name
         name: String,
+    },
+    /// Delete a task list
+    Delete {
+        /// List name
+        name: String,
+        /// Delete files without confirmation
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Rename a task list
+    Rename {
+        /// Current list name
+        old_name: String,
+        /// New list name
+        new_name: String,
+    },
+    /// Show detailed information about a list
+    Info {
+        /// List name
+        name: String,
+    },
+    /// Reorder a list's position
+    Reorder {
+        /// List name
+        name: String,
+        /// New position (0-based index)
+        position: usize,
+    },
+    /// Archive a list (hide from default view)
+    Archive {
+        /// List name
+        name: String,
+    },
+    /// Unarchive a list
+    Unarchive {
+        /// List name
+        name: String,
+    },
+    /// Merge one list into another
+    Merge {
+        /// Source list name
+        source: String,
+        /// Destination list name
+        destination: String,
+        /// Delete source list after merging
+        #[arg(short, long)]
+        delete_source: bool,
     },
 }
 
@@ -172,14 +263,35 @@ async fn main() -> Result<()> {
             WorkspaceCommands::List => commands::workspace::list(),
             WorkspaceCommands::Switch { name } => commands::workspace::switch(name),
             WorkspaceCommands::Remove { name } => commands::workspace::remove(name),
+            WorkspaceCommands::Destroy { name } => commands::workspace::destroy(name),
             WorkspaceCommands::Retarget { name, path } => {
                 commands::workspace::retarget(name, path)
             }
             WorkspaceCommands::Migrate { name, path } => commands::workspace::migrate(name, path),
         },
-        Commands::ListCmd { command } => match command {
-            Some(ListCommands::Create { name }) => commands::list::create(name, None),
-            None => commands::list::list_all(None),
+        Commands::Ls {
+            list,
+            workspace,
+            show_archived,
+            completed,
+        } => commands::list::list_all(list, workspace, show_archived, completed),
+        Commands::List(cmd) => match cmd {
+            ListCommands::Create { name } => commands::list::create(name, None),
+            ListCommands::Delete { name, force } => commands::list::delete(name, force, None),
+            ListCommands::Rename { old_name, new_name } => {
+                commands::list::rename(old_name, new_name, None)
+            }
+            ListCommands::Info { name } => commands::list::info(name, None),
+            ListCommands::Reorder { name, position } => {
+                commands::list::reorder(name, position, None)
+            }
+            ListCommands::Archive { name } => commands::list::archive(name, true, None),
+            ListCommands::Unarchive { name } => commands::list::archive(name, false, None),
+            ListCommands::Merge {
+                source,
+                destination,
+                delete_source,
+            } => commands::list::merge(source, destination, delete_source, None),
         },
         Commands::Add {
             title,
@@ -188,7 +300,14 @@ async fn main() -> Result<()> {
             workspace,
         } => commands::task::add(title, list, due, workspace),
         Commands::Complete { task_id, workspace } => commands::task::complete(task_id, workspace),
+        Commands::Uncomplete { task_id, workspace } => commands::task::uncomplete(task_id, workspace),
         Commands::Delete { task_id, workspace } => commands::task::delete(task_id, workspace),
+        Commands::Clean { list, workspace } => commands::task::clean(list, workspace),
+        Commands::Move {
+            task_id,
+            list,
+            workspace,
+        } => commands::task::move_task(task_id, list, workspace),
         Commands::Edit { task_id, workspace } => commands::task::edit(task_id, workspace),
         Commands::Group { command } => match command {
             GroupCommands::Enable { list } => commands::group::set_group(list, true),

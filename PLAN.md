@@ -101,6 +101,7 @@ TaskList {
     created_at: DateTime,
     updated_at: DateTime,
     group_by_due_date: bool,    // If true, group by due date before applying task_order
+    archived: bool,              // If true, list is hidden from default view
 }
 
 AppConfig {
@@ -110,6 +111,8 @@ AppConfig {
 
 WorkspaceConfig {
     path: PathBuf,
+    webdav_url: Option<String>,           // WebDAV server URL for sync (Phase 2)
+    last_sync: Option<DateTime>,          // Last sync timestamp (Phase 2)
 }
 ```
 
@@ -146,6 +149,7 @@ WorkspaceConfig {
   "created_at": "2025-10-26T10:00:00Z",
   "updated_at": "2025-10-27T14:30:00Z",
   "group_by_due_date": false,
+  "archived": false,
   "task_order": [
     "task-uuid-1",
     "task-uuid-2",
@@ -199,7 +203,15 @@ impl TaskRepository {
     // List operations
     pub fn create_list(&mut self, name: String) -> Result<TaskList>;
     pub fn get_lists(&self) -> Result<Vec<TaskList>>;
+    pub fn get_list(&self, list_id: Uuid) -> Result<TaskList>;
     pub fn delete_list(&mut self, id: Uuid) -> Result<()>;
+    pub fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()>; // ⭐ Enhancement
+    pub fn archive_list(&mut self, list_id: Uuid, archived: bool) -> Result<()>; // ⭐ Enhancement
+    pub fn reorder_list(&mut self, list_id: Uuid, new_position: usize) -> Result<()>; // ⭐ Enhancement
+
+    // Helper methods
+    pub fn find_task(&self, task_id: Uuid) -> Result<(Uuid, Task)>;
+    pub fn find_list_by_name(&self, name: &str) -> Result<Uuid>;
 
     // Task ordering (modifies .listdata.json)
     pub fn reorder_task(&mut self, list_id: Uuid, task_id: Uuid, new_position: usize) -> Result<()>;
@@ -208,6 +220,12 @@ impl TaskRepository {
     // Grouping preference (modifies .listdata.json)
     pub fn set_group_by_due_date(&mut self, list_id: Uuid, enabled: bool) -> Result<()>;
     pub fn get_group_by_due_date(&self, list_id: Uuid) -> Result<bool>;
+
+    // Phase 2: Sync operations
+    pub async fn sync_push(&self, webdav_client: WebDavClient) -> Result<SyncResult>;
+    pub async fn sync_pull(&self, webdav_client: WebDavClient) -> Result<SyncResult>;
+    pub async fn sync(&self, webdav_client: WebDavClient) -> Result<SyncResult>;
+    pub async fn sync_status(&self, webdav_client: WebDavClient) -> Result<SyncStatus>;
 }
 
 pub trait Storage {
@@ -293,16 +311,50 @@ tokio = { workspace = true }
 - [x] CLI: `workspace remove` command (delete workspace)
 - [x] CLI: `workspace retarget` command (update workspace path without moving files)
 - [x] CLI: `workspace migrate` command (move files to new location)
+- [x] CLI: `workspace destroy` command (delete workspace and all files) ⭐ *Enhancement*
 - [x] CLI: `list create` command (create new task lists)
-- [x] CLI: `list` command (view tasks)
+- [x] CLI: `list delete` command (delete lists with confirmation) ⭐ *Enhancement*
+- [x] CLI: `list rename` command (rename lists) ⭐ *Enhancement*
+- [x] CLI: `list info` command (show list statistics) ⭐ *Enhancement*
+- [x] CLI: `list reorder` command (change display order) ⭐ *Enhancement*
+- [x] CLI: `list archive/unarchive` commands (hide lists from view) ⭐ *Enhancement*
+- [x] CLI: `list merge` command (merge lists together) ⭐ *Enhancement*
+- [x] CLI: `ls` command (view tasks - separated from list management) ⭐ *Enhancement*
 - [x] CLI: `add` command (create tasks)
 - [x] CLI: `complete` command (mark done)
 - [x] CLI: `delete` command (remove tasks)
+- [x] CLI: `move` command (move tasks between lists) ⭐ *Enhancement*
 - [x] CLI: `edit` command (modify tasks - CLI only, creates temp file)
 - [x] Manual task ordering (always via task_order array)
 - [x] CLI: `group` command (toggle group-by-due-date for a list)
 - [x] Support for `--workspace` flag on all commands
+- [x] Support for `--show-archived` flag on `ls` command ⭐ *Enhancement*
 - [x] Comprehensive unit and integration tests (>80% coverage)
+
+**Phase 1 Enhancements Beyond Original Plan** ⭐
+
+The following features were added during Phase 1 development to provide a more complete task management experience:
+
+1. **Advanced Workspace Management**
+   - `workspace destroy` - Complete workspace deletion including all files
+
+2. **Comprehensive List Management**
+   - `list delete` - Delete lists with safety confirmation
+   - `list rename` - Rename existing lists
+   - `list info` - View detailed list statistics (task count, completion %, dates)
+   - `list reorder` - Change list display order
+   - `list archive/unarchive` - Hide/show lists without deletion
+   - `list merge` - Combine lists together with optional source deletion
+
+3. **Enhanced CLI Structure**
+   - `ls` command - Dedicated command for viewing tasks (like Unix `ls`)
+   - `list` command - Now purely for list management with subcommands
+   - `--show-archived` flag - View archived lists
+
+4. **Task Movement**
+   - `move` command - Move individual tasks between lists
+
+These enhancements provide a production-ready task management system with complete CRUD operations for both tasks and lists.
 
 ### CLI Usage Examples
 

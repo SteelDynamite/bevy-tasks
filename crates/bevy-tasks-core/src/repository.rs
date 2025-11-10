@@ -130,8 +130,17 @@ impl TaskRepository {
 
     /// Create a new task list
     pub fn create_list(&mut self, name: String) -> Result<TaskList> {
-        let _list_id = self.storage.create_list(&name)?;
-        Ok(TaskList::new(name))
+        let list_id = self.storage.create_list(&name)?;
+        let metadata = self.storage.read_list_metadata(list_id)?;
+        Ok(TaskList {
+            id: list_id,
+            title: name,
+            tasks: Vec::new(),
+            created_at: metadata.created_at,
+            updated_at: metadata.updated_at,
+            group_by_due_date: metadata.group_by_due_date,
+            archived: metadata.archived,
+        })
     }
 
     /// Get all task lists
@@ -151,6 +160,7 @@ impl TaskRepository {
                 created_at: metadata.created_at,
                 updated_at: metadata.updated_at,
                 group_by_due_date: metadata.group_by_due_date,
+                archived: metadata.archived,
             });
         }
 
@@ -184,12 +194,39 @@ impl TaskRepository {
             created_at: metadata.created_at,
             updated_at: metadata.updated_at,
             group_by_due_date: metadata.group_by_due_date,
+            archived: metadata.archived,
         })
     }
 
     /// Delete a task list
     pub fn delete_list(&mut self, list_id: Uuid) -> Result<()> {
         self.storage.delete_list(list_id)
+    }
+
+    /// Rename a task list
+    pub fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()> {
+        self.storage.rename_list(list_id, new_name)
+    }
+
+    /// Archive or unarchive a task list
+    pub fn archive_list(&mut self, list_id: Uuid, archived: bool) -> Result<()> {
+        self.storage.archive_list(list_id, archived)
+    }
+
+    /// Reorder a task list in the global list order
+    pub fn reorder_list(&mut self, list_id: Uuid, new_position: usize) -> Result<()> {
+        let mut global_metadata = self.storage.read_global_metadata()?;
+
+        // Remove list from current position
+        global_metadata.list_order.retain(|&id| id != list_id);
+
+        // Insert at new position
+        let insert_pos = new_position.min(global_metadata.list_order.len());
+        global_metadata.list_order.insert(insert_pos, list_id);
+
+        self.storage.write_global_metadata(&global_metadata)?;
+
+        Ok(())
     }
 
     // Task ordering operations
@@ -403,5 +440,120 @@ mod tests {
 
         let order = repo.get_task_order(list_id).unwrap();
         assert_eq!(order, vec![id3, id1, id2]);
+    }
+
+    #[test]
+    fn test_rename_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        let list_id = lists[0].id;
+
+        repo.rename_list(list_id, "Renamed List".to_string())
+            .unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert_eq!(lists[0].title, "Renamed List");
+    }
+
+    #[test]
+    fn test_archive_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        let list_id = lists[0].id;
+
+        // Initially not archived
+        assert!(!lists[0].archived);
+
+        // Archive the list
+        repo.archive_list(list_id, true).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert!(lists[0].archived);
+
+        // Unarchive the list
+        repo.archive_list(list_id, false).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert!(!lists[0].archived);
+    }
+
+    #[test]
+    fn test_reorder_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let my_tasks = repo.get_lists().unwrap()[0].id;
+        let _list1 = repo.create_list("List 1".to_string()).unwrap();
+        let list2 = repo.create_list("List 2".to_string()).unwrap();
+
+        // Initial order: My Tasks, List 1, List 2
+        let lists = repo.get_lists().unwrap();
+        assert_eq!(lists.len(), 3);
+        assert_eq!(lists[0].title, "My Tasks");
+
+        // Move List 2 to position 0
+        repo.reorder_list(list2.id, 0).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert_eq!(lists[0].title, "List 2");
+        assert_eq!(lists[1].title, "My Tasks");
+        assert_eq!(lists[2].title, "List 1");
+
+        // Move My Tasks to position 1
+        repo.reorder_list(my_tasks, 1).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert_eq!(lists[0].title, "List 2");
+        assert_eq!(lists[1].title, "My Tasks");
+        assert_eq!(lists[2].title, "List 1");
+    }
+
+    #[test]
+    fn test_find_list_by_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        repo.create_list("Work".to_string()).unwrap();
+
+        let list_id = repo.find_list_by_name("Work").unwrap();
+        let list = repo.get_list(list_id).unwrap();
+
+        assert_eq!(list.title, "Work");
+    }
+
+    #[test]
+    fn test_find_task() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        let list_id = lists[0].id;
+
+        let task = Task::new("Findable Task".to_string());
+        let task_id = task.id;
+        repo.create_task(list_id, task).unwrap();
+
+        let (found_list_id, found_task) = repo.find_task(task_id).unwrap();
+
+        assert_eq!(found_list_id, list_id);
+        assert_eq!(found_task.title, "Findable Task");
+    }
+
+    #[test]
+    fn test_delete_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let work_list = repo.create_list("Work".to_string()).unwrap();
+
+        repo.delete_list(work_list.id).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert_eq!(lists.len(), 1);
+        assert!(!lists.iter().any(|l| l.title == "Work"));
     }
 }

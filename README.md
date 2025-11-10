@@ -14,13 +14,23 @@ A local-first, cross-platform tasks application inspired by Google Tasks. Built 
 ### Phase 1 ✅ Complete - Core Library & CLI MVP
 
 - ✅ Full-featured task management backend
-- ✅ Multiple workspace support
+- ✅ Multiple workspace support with full lifecycle management
+  - Create, switch, remove, destroy, retarget, migrate
 - ✅ Markdown-based task storage with YAML frontmatter (Obsidian-compatible)
-- ✅ Manual task ordering
-- ✅ Due date support
-- ✅ Task grouping by due date
+- ✅ Advanced list management
+  - Create, delete, rename, archive, reorder, merge lists
+  - List info with statistics
+  - Archived lists filtering
+- ✅ Task operations
+  - Create, complete, delete, edit, move between lists
+  - Manual task ordering
+  - Due date support
+  - Task grouping by due date
 - ✅ Command-line interface (CLI)
-- ✅ Comprehensive test coverage (24 tests passing)
+  - Intuitive `ls` command for viewing tasks
+  - Comprehensive `list` subcommands for list management
+  - Per-command workspace targeting with `--workspace` flag
+- ✅ Comprehensive test coverage (30 tests passing)
 
 ### Phase 2 ✅ 87.5% Complete - WebDAV Sync
 
@@ -96,21 +106,40 @@ bevy-tasks add "Team meeting" --due 2025-11-15
 ### View Tasks
 
 ```bash
-# List all tasks in all lists
-bevy-tasks list
+# List all uncompleted tasks (default behavior)
+bevy-tasks ls
 
 # View tasks in a specific list
-bevy-tasks list --list Work
+bevy-tasks ls --list Work
+
+# Show only completed tasks
+bevy-tasks ls --completed
 ```
+
+Task IDs are displayed in dimmed gray at the end of each task for easy reference.
+
+**Note**: By default, `ls` shows only uncompleted tasks. Use `--completed` to view only completed tasks.
 
 ### Complete and Delete Tasks
 
 ```bash
-# Complete a task (use the task ID from list output)
+# Complete a task (use the task ID from ls output)
 bevy-tasks complete <task-id>
+
+# Uncomplete a task
+bevy-tasks uncomplete <task-id>
 
 # Delete a task
 bevy-tasks delete <task-id>
+
+# Move a task to a different list
+bevy-tasks move <task-id> "Target List"
+
+# Clean (delete) all completed tasks
+bevy-tasks clean
+
+# Clean completed tasks from a specific list
+bevy-tasks clean --list "My Tasks"
 ```
 
 ### Edit Tasks
@@ -144,6 +173,9 @@ bevy-tasks workspace migrate personal ~/Dropbox/Tasks
 
 # Remove a workspace (keeps files on disk)
 bevy-tasks workspace remove shared
+
+# Destroy a workspace (deletes all files and config)
+bevy-tasks workspace destroy shared
 ```
 
 ### List Management
@@ -153,7 +185,40 @@ bevy-tasks workspace remove shared
 bevy-tasks list create "Work"
 
 # View all tasks
-bevy-tasks list
+bevy-tasks ls
+
+# View tasks in a specific list
+bevy-tasks ls --list Work
+
+# Show detailed information about a list
+bevy-tasks list info "Work"
+
+# Rename a list
+bevy-tasks list rename "Old Name" "New Name"
+
+# Delete a list (with confirmation)
+bevy-tasks list delete "Work"
+
+# Delete a list without confirmation
+bevy-tasks list delete "Work" --force
+
+# Merge one list into another
+bevy-tasks list merge "Source" "Destination"
+
+# Merge and delete source list
+bevy-tasks list merge "Source" "Destination" --delete-source
+
+# Archive a list (hide from default view)
+bevy-tasks list archive "Work"
+
+# Unarchive a list
+bevy-tasks list unarchive "Work"
+
+# Show archived lists
+bevy-tasks ls --show-archived
+
+# Reorder a list (change display position)
+bevy-tasks list reorder "Work" 0
 
 # Enable grouping by due date
 bevy-tasks group enable --list Work
@@ -174,7 +239,7 @@ bevy-tasks add "Team standup" --workspace shared
 bevy-tasks complete <task-id> --workspace shared
 
 # View tasks from a specific workspace
-bevy-tasks list --workspace shared
+bevy-tasks ls --workspace shared
 ```
 
 ### WebDAV Sync (Phase 2)
@@ -362,7 +427,7 @@ cargo build --release
 # Run the CLI directly
 cargo run -p bevy-tasks-cli -- init ~/test-tasks --name test
 cargo run -p bevy-tasks-cli -- add "Test task"
-cargo run -p bevy-tasks-cli -- list
+cargo run -p bevy-tasks-cli -- ls
 
 # Test sync commands (requires WebDAV server)
 cargo run -p bevy-tasks-cli -- sync --setup
