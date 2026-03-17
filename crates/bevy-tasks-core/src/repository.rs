@@ -5,7 +5,7 @@ use crate::models::{Task, TaskList};
 use crate::storage::{FileSystemStorage, Storage};
 
 pub struct TaskRepository {
-    storage: Box<dyn Storage>,
+    storage: Box<dyn Storage + Send + Sync>,
 }
 
 impl TaskRepository {

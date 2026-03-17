@@ -459,7 +459,7 @@ impl SyncState {
 // --- Sync Executor ---
 
 /// Callback type for sync progress reporting.
-pub type ProgressCallback = Box<dyn Fn(&str) + Send>;
+pub type ProgressCallback = Box<dyn Fn(&str) + Send + Sync>;
 
 /// Execute a full sync between a local workspace and a remote WebDAV server.
 pub async fn sync_workspace(
@@ -557,7 +557,7 @@ async fn execute_action(
     workspace_path: &Path,
     action: &SyncAction,
     sync_state: &mut SyncState,
-    report: &dyn Fn(&str),
+    report: &(dyn Fn(&str) + Send + Sync),
 ) -> Result<()> {
     match action {
         SyncAction::Upload { path } | SyncAction::ConflictLocalWins { path } => {
