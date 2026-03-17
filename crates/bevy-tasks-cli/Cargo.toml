@@ -1,0 +1,17 @@
+[package]
+name = "bevy-tasks-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "bevy-tasks"
+path = "src/main.rs"
+
+[dependencies]
+bevy-tasks-core = { path = "../bevy-tasks-core" }
+clap = { version = "4.5", features = ["derive", "env"] }
+colored = "2.0"
+indicatif = "0.17"
+anyhow = { workspace = true }
+tokio = { workspace = true }
+fs_extra = "1.3"
