@@ -123,7 +123,6 @@ impl FileSystemStorage {
 
     fn list_dir_path(&self, list_id: Uuid) -> Result<PathBuf> {
         // Find the directory with this list ID
-        let metadata = self.read_root_metadata()?;
         let entries = fs::read_dir(&self.root_path)?;
 
         for entry in entries {
@@ -250,6 +249,23 @@ impl Storage for FileSystemStorage {
     fn write_task(&mut self, list_id: Uuid, task: &Task) -> Result<()> {
         let list_dir = self.list_dir_path(list_id)?;
         let task_path = self.task_file_path(&list_dir, task);
+
+        // Remove old file if task was renamed (different filename, same ID)
+        for entry in fs::read_dir(&list_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path == task_path { continue; }
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    if let Ok((fm, _)) = self.parse_markdown_with_frontmatter(&content) {
+                        if fm.id == task.id {
+                            fs::remove_file(&path)?;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
         let content = self.write_markdown_with_frontmatter(task)?;
         fs::write(&task_path, content)?;

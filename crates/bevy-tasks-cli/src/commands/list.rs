@@ -4,7 +4,7 @@ use crate::output;
 use crate::commands::get_repository;
 
 pub fn create(name: String, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     repo.create_list(name.clone())
         .context("Failed to create list")?;
@@ -15,7 +15,7 @@ pub fn create(name: String, workspace: Option<String>) -> Result<()> {
 }
 
 pub fn show(list_name: Option<String>, workspace: Option<String>) -> Result<()> {
-    let (repo, workspace_name) = get_repository(workspace)?;
+    let (repo, _workspace_name) = get_repository(workspace)?;
 
     let lists = repo.get_lists()
         .context("Failed to get lists")?;
@@ -49,7 +49,8 @@ pub fn show(list_name: Option<String>, workspace: Option<String>) -> Result<()> 
                     String::new()
                 };
 
-                println!("  {} {}{}", checkbox, task.title, due_str);
+                let id_str = task.id.to_string();
+                println!("  {} {}{} {}", checkbox, task.title, due_str, id_str.dimmed());
             }
         }
     } else {
@@ -73,7 +74,8 @@ pub fn show(list_name: Option<String>, workspace: Option<String>) -> Result<()> 
                         String::new()
                     };
 
-                    println!("  {} {}{}", checkbox, task.title, due_str);
+                    let id_str = task.id.to_string();
+                    println!("  {} {}{} {}", checkbox, task.title, due_str, id_str.dimmed());
                 }
             }
             println!();
@@ -84,7 +86,7 @@ pub fn show(list_name: Option<String>, workspace: Option<String>) -> Result<()> 
 }
 
 pub fn delete(name: String, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     let lists = repo.get_lists()
         .context("Failed to get lists")?;

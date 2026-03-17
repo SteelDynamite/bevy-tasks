@@ -191,14 +191,15 @@ impl TaskRepository {
 
     // Task operations
     pub fn create_task(&mut self, list_id: Uuid, task: Task) -> Result<Task>;
-    pub fn get_task(&self, id: Uuid) -> Result<Task>;
-    pub fn update_task(&mut self, task: Task) -> Result<()>;
-    pub fn delete_task(&mut self, id: Uuid) -> Result<()>;
+    pub fn get_task(&self, list_id: Uuid, task_id: Uuid) -> Result<Task>;
+    pub fn update_task(&mut self, list_id: Uuid, task: Task) -> Result<()>;
+    pub fn delete_task(&mut self, list_id: Uuid, task_id: Uuid) -> Result<()>;
     pub fn list_tasks(&self, list_id: Uuid) -> Result<Vec<Task>>;
 
     // List operations
     pub fn create_list(&mut self, name: String) -> Result<TaskList>;
     pub fn get_lists(&self) -> Result<Vec<TaskList>>;
+    pub fn get_list(&self, list_id: Uuid) -> Result<TaskList>;
     pub fn delete_list(&mut self, id: Uuid) -> Result<()>;
 
     // Task ordering (modifies .listdata.json)
@@ -242,17 +243,15 @@ tokio = { version = "1.40", features = ["full"] }
 [package]
 name = "bevy-tasks-core"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
 serde_json = "1.0"
 serde_yaml = "0.9"        # YAML frontmatter
-pulldown-cmark = "0.12"   # Markdown parsing
 uuid = { workspace = true }
 chrono = { workspace = true }
 directories = "5.0"
-anyhow = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.0"
@@ -263,7 +262,7 @@ tempfile = "3.0"
 [package]
 name = "bevy-tasks-cli"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [[bin]]
 name = "bevy-tasks"
@@ -273,36 +272,35 @@ path = "src/main.rs"
 bevy-tasks-core = { path = "../bevy-tasks-core" }
 clap = { version = "4.5", features = ["derive", "env"] }
 colored = "2.0"
-indicatif = "0.17"
 anyhow = { workspace = true }
-tokio = { workspace = true }
+fs_extra = "1.3"
 ```
 
 ### Features
 
-- [ ] Cargo workspace setup
-- [ ] Data models (Task, TaskList, AppConfig, WorkspaceConfig)
-- [ ] Markdown file I/O with YAML frontmatter parsing
-- [ ] Local storage implementation
-- [ ] Repository pattern and public API
-- [ ] Multiple workspace support
-- [ ] CLI: `init` command (create named workspace)
-- [ ] CLI: `workspace add` command (add additional workspaces)
-- [ ] CLI: `workspace list` command (view all workspaces)
-- [ ] CLI: `workspace switch` command (change current workspace)
-- [ ] CLI: `workspace remove` command (delete workspace)
-- [ ] CLI: `workspace retarget` command (update workspace path without moving files)
-- [ ] CLI: `workspace migrate` command (move files to new location)
-- [ ] CLI: `list create` command (create new task lists)
-- [ ] CLI: `list` command (view tasks)
-- [ ] CLI: `add` command (create tasks)
-- [ ] CLI: `complete` command (mark done)
-- [ ] CLI: `delete` command (remove tasks)
-- [ ] CLI: `edit` command (modify tasks - CLI only, creates temp file)
-- [ ] Manual task ordering (always via task_order array)
-- [ ] CLI: `group` command (toggle group-by-due-date for a list)
-- [ ] Support for `--workspace` flag on all commands
-- [ ] Comprehensive unit and integration tests (>80% coverage)
+- [x] Cargo workspace setup
+- [x] Data models (Task, TaskList, AppConfig, WorkspaceConfig)
+- [x] Markdown file I/O with YAML frontmatter parsing
+- [x] Local storage implementation
+- [x] Repository pattern and public API
+- [x] Multiple workspace support
+- [x] CLI: `init` command (create named workspace)
+- [x] CLI: `workspace add` command (add additional workspaces)
+- [x] CLI: `workspace list` command (view all workspaces)
+- [x] CLI: `workspace switch` command (change current workspace)
+- [x] CLI: `workspace remove` command (delete workspace)
+- [x] CLI: `workspace retarget` command (update workspace path without moving files)
+- [x] CLI: `workspace migrate` command (move files to new location)
+- [x] CLI: `list create` command (create new task lists)
+- [x] CLI: `list` command (view tasks)
+- [x] CLI: `add` command (create tasks)
+- [x] CLI: `complete` command (mark done)
+- [x] CLI: `delete` command (remove tasks)
+- [x] CLI: `edit` command (modify tasks - CLI only, creates temp file)
+- [x] Manual task ordering (always via task_order array)
+- [x] CLI: `group` command (toggle group-by-due-date for a list)
+- [x] Support for `--workspace` flag on all commands
+- [x] Comprehensive unit and integration tests (>80% coverage)
 
 ### CLI Usage Examples
 
@@ -347,7 +345,7 @@ $ bevy-tasks add "Team meeting" --workspace shared
 ✓ Created task "Team meeting" in workspace "shared"
 
 # List all tasks (from current workspace)
-$ bevy-tasks list
+$ bevy-tasks list show
 My Tasks (3 tasks)
   [ ] Buy groceries
   [ ] Call dentist
@@ -358,13 +356,13 @@ Work (2 tasks)
   [ ] Team meeting prep
 
 # List tasks from specific workspace
-$ bevy-tasks list --workspace shared
+$ bevy-tasks list show --workspace shared
 Shared Tasks (2 tasks)
   [ ] Team meeting
   [ ] Quarterly planning
 
 # List tasks in specific list
-$ bevy-tasks list --list "Work"
+$ bevy-tasks list show --list "Work"
 Work (2 tasks)
   [ ] Review PR #123 (due: 2025-11-15)
   [ ] Team meeting prep
@@ -414,11 +412,11 @@ $ bevy-tasks group disable --list "Personal"
 
 ### Deliverables
 
-- [ ] `bevy-tasks-core` library with stable API
-- [ ] Functional CLI that can manage tasks
-- [ ] Data persists as Obsidian-compatible .md files
-- [ ] Well-tested backend (>80% coverage)
-- [ ] Documentation for core library API
+- [x] `bevy-tasks-core` library with stable API
+- [x] Functional CLI that can manage tasks
+- [x] Data persists as Obsidian-compatible .md files
+- [x] Well-tested backend (>80% coverage)
+- [x] Documentation for core library API
 
 ### Development Setup
 
@@ -980,6 +978,6 @@ This project is free and open-source software licensed under GPL v3.
 
 ---
 
-**Last Updated**: 2025-10-27
-**Document Version**: 3.0
+**Last Updated**: 2026-03-17
+**Document Version**: 3.1
 **Status**: Ready to Implement - Milestone-Driven Plan

@@ -1,13 +1,12 @@
 use anyhow::{Context, Result};
-use bevy_tasks_core::{Task, TaskStatus};
+use bevy_tasks_core::Task;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use std::io::Write;
 use crate::output;
 use crate::commands::get_repository;
 
 pub fn add(title: String, list_name: Option<String>, due_str: Option<String>, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     // Get lists
     let lists = repo.get_lists()
@@ -52,7 +51,7 @@ pub fn add(title: String, list_name: Option<String>, due_str: Option<String>, wo
 }
 
 pub fn complete(task_id_str: String, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     let task_id = Uuid::parse_str(&task_id_str)
         .context("Invalid task ID")?;
@@ -81,7 +80,7 @@ pub fn complete(task_id_str: String, workspace: Option<String>) -> Result<()> {
 }
 
 pub fn delete(task_id_str: String, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     let task_id = Uuid::parse_str(&task_id_str)
         .context("Invalid task ID")?;
@@ -111,7 +110,7 @@ pub fn delete(task_id_str: String, workspace: Option<String>) -> Result<()> {
 }
 
 pub fn edit(task_id_str: String, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     let task_id = Uuid::parse_str(&task_id_str)
         .context("Invalid task ID")?;

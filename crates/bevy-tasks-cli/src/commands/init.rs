@@ -15,9 +15,12 @@ pub fn execute(path: String, name: String) -> Result<()> {
     let mut repo = TaskRepository::init(path_buf.clone())
         .context("Failed to initialize tasks folder")?;
 
-    // Create default list
-    repo.create_list("My Tasks".to_string())
-        .context("Failed to create default list")?;
+    // Create default list if it doesn't exist
+    let lists = repo.get_lists().context("Failed to get lists")?;
+    if !lists.iter().any(|l| l.title == "My Tasks") {
+        repo.create_list("My Tasks".to_string())
+            .context("Failed to create default list")?;
+    }
 
     // Load or create config
     let config_path = AppConfig::get_config_path();

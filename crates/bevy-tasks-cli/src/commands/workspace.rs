@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use bevy_tasks_core::{AppConfig, TaskRepository, WorkspaceConfig};
+use bevy_tasks_core::{TaskRepository, WorkspaceConfig};
 use std::path::PathBuf;
 use colored::*;
 use crate::output;
@@ -17,9 +17,12 @@ pub fn add(name: String, path: String) -> Result<()> {
     let mut repo = TaskRepository::init(path_buf.clone())
         .context("Failed to initialize tasks folder")?;
 
-    // Create default list
-    repo.create_list("My Tasks".to_string())
-        .context("Failed to create default list")?;
+    // Create default list if it doesn't exist
+    let lists = repo.get_lists().context("Failed to get lists")?;
+    if !lists.iter().any(|l| l.title == "My Tasks") {
+        repo.create_list("My Tasks".to_string())
+            .context("Failed to create default list")?;
+    }
 
     // Load config
     let mut config = load_config()?;
@@ -51,7 +54,10 @@ pub fn list() -> Result<()> {
 
     let current = config.current_workspace.as_deref();
 
-    for (name, workspace_config) in &config.workspaces {
+    let mut workspaces: Vec<_> = config.workspaces.iter().collect();
+    workspaces.sort_by(|a, b| a.0.cmp(b.0));
+
+    for (name, workspace_config) in workspaces {
         let marker = if Some(name.as_str()) == current {
             " (current)".green()
         } else {

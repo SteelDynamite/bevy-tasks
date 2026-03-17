@@ -3,7 +3,7 @@ use crate::output;
 use crate::commands::get_repository;
 
 pub fn enable(list_name: String, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     let lists = repo.get_lists()
         .context("Failed to get lists")?;
@@ -21,7 +21,7 @@ pub fn enable(list_name: String, workspace: Option<String>) -> Result<()> {
 }
 
 pub fn disable(list_name: String, workspace: Option<String>) -> Result<()> {
-    let (mut repo, workspace_name) = get_repository(workspace)?;
+    let (mut repo, _workspace_name) = get_repository(workspace)?;
 
     let lists = repo.get_lists()
         .context("Failed to get lists")?;
