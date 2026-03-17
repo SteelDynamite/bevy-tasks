@@ -3,6 +3,7 @@ pub mod workspace;
 pub mod list;
 pub mod task;
 pub mod group;
+pub mod sync;
 
 use bevy_tasks_core::{AppConfig, TaskRepository};
 use anyhow::{Context, Result};

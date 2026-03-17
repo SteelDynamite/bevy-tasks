@@ -10,6 +10,9 @@ pub enum Error {
     WorkspaceNotFound(String),
     ListNotFound(String),
     TaskNotFound(String),
+    WebDav(String),
+    Sync(String),
+    Credential(String),
 }
 
 impl fmt::Display for Error {
@@ -22,6 +25,9 @@ impl fmt::Display for Error {
             Error::WorkspaceNotFound(name) => write!(f, "Workspace not found: {}", name),
             Error::ListNotFound(id) => write!(f, "List not found: {}", id),
             Error::TaskNotFound(id) => write!(f, "Task not found: {}", id),
+            Error::WebDav(msg) => write!(f, "WebDAV error: {}", msg),
+            Error::Sync(msg) => write!(f, "Sync error: {}", msg),
+            Error::Credential(msg) => write!(f, "Credential error: {}", msg),
         }
     }
 }
@@ -43,6 +49,12 @@ impl From<serde_json::Error> for Error {
 impl From<serde_yaml::Error> for Error {
     fn from(err: serde_yaml::Error) -> Self {
         Error::Serialization(err.to_string())
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Self {
+        Error::WebDav(err.to_string())
     }
 }
 

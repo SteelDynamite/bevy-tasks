@@ -6,11 +6,15 @@ use crate::error::{Error, Result};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
     pub path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub webdav_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub last_sync: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl WorkspaceConfig {
     pub fn new(path: PathBuf) -> Self {
-        Self { path }
+        Self { path, webdav_url: None, last_sync: None }
     }
 }
 
@@ -200,5 +204,44 @@ mod tests {
 
         assert_eq!(config.get_workspace("ws").unwrap().path, PathBuf::from("/new"));
         assert_eq!(config.workspaces.len(), 1);
+    }
+
+    #[test]
+    fn test_workspace_config_with_webdav_fields_roundtrip() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        let mut config = AppConfig::new();
+        let mut ws = WorkspaceConfig::new(PathBuf::from("/tasks"));
+        ws.webdav_url = Some("https://dav.example.com/tasks".to_string());
+        ws.last_sync = Some(chrono::Utc::now());
+        config.add_workspace("synced".to_string(), ws);
+        config.save_to_file(&config_path).unwrap();
+
+        let loaded = AppConfig::load_from_file(&config_path).unwrap();
+        let ws = loaded.get_workspace("synced").unwrap();
+        assert_eq!(ws.webdav_url.as_deref(), Some("https://dav.example.com/tasks"));
+        assert!(ws.last_sync.is_some());
+    }
+
+    #[test]
+    fn test_backwards_compat_loading_old_format() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        // Write old-format JSON without webdav_url or last_sync fields
+        let old_json = r#"{
+            "workspaces": {
+                "personal": { "path": "/home/user/tasks" }
+            },
+            "current_workspace": "personal"
+        }"#;
+        std::fs::write(&config_path, old_json).unwrap();
+
+        let loaded = AppConfig::load_from_file(&config_path).unwrap();
+        let ws = loaded.get_workspace("personal").unwrap();
+        assert_eq!(ws.path, PathBuf::from("/home/user/tasks"));
+        assert!(ws.webdav_url.is_none());
+        assert!(ws.last_sync.is_none());
     }
 }

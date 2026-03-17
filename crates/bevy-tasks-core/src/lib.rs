@@ -3,6 +3,8 @@ pub mod storage;
 pub mod repository;
 pub mod config;
 pub mod error;
+pub mod webdav;
+pub mod sync;
 
 pub use models::{Task, TaskStatus, TaskList};
 pub use repository::TaskRepository;

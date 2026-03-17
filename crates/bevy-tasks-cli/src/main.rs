@@ -77,6 +77,28 @@ enum Commands {
     /// Toggle group-by-due-date for a list
     #[command(subcommand)]
     Group(GroupCommands),
+
+    /// Sync workspace with WebDAV server
+    Sync {
+        /// Run initial setup (URL, credentials)
+        #[arg(long)]
+        setup: bool,
+        /// Push-only sync (upload local changes)
+        #[arg(long, conflicts_with_all = ["pull", "setup", "status"])]
+        push: bool,
+        /// Pull-only sync (download remote changes)
+        #[arg(long, conflicts_with_all = ["push", "setup", "status"])]
+        pull: bool,
+        /// Show sync status
+        #[arg(long, conflicts_with_all = ["push", "pull", "setup"])]
+        status: bool,
+        /// Show status for all workspaces (with --status)
+        #[arg(long, requires = "status")]
+        all: bool,
+        /// Workspace to use
+        #[arg(short, long)]
+        workspace: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -231,6 +253,22 @@ fn main() -> Result<()> {
             }
             GroupCommands::Disable { list, workspace } => {
                 group::disable(list, workspace)?;
+            }
+        },
+        Commands::Sync { setup, push, pull, status, all, workspace } => {
+            if setup {
+                sync::setup(workspace)?;
+            } else if status {
+                sync::status(workspace, all)?;
+            } else {
+                let mode = if push {
+                    bevy_tasks_core::sync::SyncMode::Push
+                } else if pull {
+                    bevy_tasks_core::sync::SyncMode::Pull
+                } else {
+                    bevy_tasks_core::sync::SyncMode::Full
+                };
+                sync::execute(mode, workspace)?;
             }
         },
     }
