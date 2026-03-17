@@ -92,6 +92,7 @@ pub trait Storage {
     fn write_list_metadata(&mut self, metadata: &ListMetadata) -> Result<()>;
 }
 
+#[derive(Debug)]
 pub struct FileSystemStorage {
     root_path: PathBuf,
 }
@@ -473,5 +474,299 @@ impl Storage for FileSystemStorage {
         let content = serde_json::to_string_pretty(&metadata)?;
         fs::write(&metadata_path, content)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Task;
+    use tempfile::TempDir;
+
+    fn init_storage(temp_dir: &TempDir) -> FileSystemStorage {
+        FileSystemStorage::init(temp_dir.path().to_path_buf()).unwrap()
+    }
+
+    // --- Frontmatter parsing ---
+
+    #[test]
+    fn test_parse_valid_frontmatter() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let content = "---\nid: 550e8400-e29b-41d4-a716-446655440000\nstatus: backlog\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-01-01T00:00:00Z\n---\n\nSome description";
+        let (fm, desc) = storage.parse_markdown_with_frontmatter(content).unwrap();
+        assert_eq!(fm.id.to_string(), "550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(fm.status, TaskStatus::Backlog);
+        assert_eq!(desc, "Some description");
+    }
+
+    #[test]
+    fn test_parse_frontmatter_no_body() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let content = "---\nid: 550e8400-e29b-41d4-a716-446655440000\nstatus: completed\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-01-01T00:00:00Z\n---";
+        let (fm, desc) = storage.parse_markdown_with_frontmatter(content).unwrap();
+        assert_eq!(fm.status, TaskStatus::Completed);
+        assert!(desc.is_empty());
+    }
+
+    #[test]
+    fn test_parse_frontmatter_missing_opening_delimiter() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let result = storage.parse_markdown_with_frontmatter("no frontmatter here");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::InvalidData(_)));
+    }
+
+    #[test]
+    fn test_parse_frontmatter_missing_closing_delimiter() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let content = "---\nid: 550e8400-e29b-41d4-a716-446655440000\nstatus: backlog\n";
+        let result = storage.parse_markdown_with_frontmatter(content);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::InvalidData(_)));
+    }
+
+    #[test]
+    fn test_parse_frontmatter_empty_content() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let result = storage.parse_markdown_with_frontmatter("");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::InvalidData(_)));
+    }
+
+    #[test]
+    fn test_parse_frontmatter_invalid_yaml() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let content = "---\n: : : not valid yaml\n---\n";
+        let result = storage.parse_markdown_with_frontmatter(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_frontmatter_with_optional_fields() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let content = "---\nid: 550e8400-e29b-41d4-a716-446655440000\nstatus: backlog\ndue: 2026-06-15T12:00:00Z\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-01-01T00:00:00Z\nparent: 660e8400-e29b-41d4-a716-446655440001\n---\n\nNotes";
+        let (fm, _) = storage.parse_markdown_with_frontmatter(content).unwrap();
+        assert!(fm.due.is_some());
+        assert!(fm.parent.is_some());
+    }
+
+    // --- Markdown write/read roundtrip ---
+
+    #[test]
+    fn test_markdown_roundtrip() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let task = Task::new("Test".to_string())
+            .with_description("Line 1\n\nLine 3".to_string());
+
+        let markdown = storage.write_markdown_with_frontmatter(&task).unwrap();
+        let (fm, desc) = storage.parse_markdown_with_frontmatter(&markdown).unwrap();
+
+        assert_eq!(fm.id, task.id);
+        assert_eq!(fm.status, task.status);
+        assert_eq!(desc, "Line 1\n\nLine 3");
+    }
+
+    // --- FileSystemStorage init/new ---
+
+    #[test]
+    fn test_new_nonexistent_path() {
+        let result = FileSystemStorage::new(PathBuf::from("/does/not/exist"));
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::NotFound(_)));
+    }
+
+    #[test]
+    fn test_init_creates_metadata() {
+        let temp_dir = TempDir::new().unwrap();
+        let _storage = init_storage(&temp_dir);
+        assert!(temp_dir.path().join(".metadata.json").exists());
+    }
+
+    #[test]
+    fn test_init_idempotent() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().to_path_buf();
+        let mut s = FileSystemStorage::init(path.clone()).unwrap();
+        let list = s.create_list("Keep Me".to_string()).unwrap();
+
+        // Re-init should not destroy existing data
+        let s2 = FileSystemStorage::init(path).unwrap();
+        let lists = s2.get_lists().unwrap();
+        assert_eq!(lists.len(), 1);
+        assert_eq!(lists[0].id, list.id);
+    }
+
+    // --- Root metadata ---
+
+    #[test]
+    fn test_root_metadata_defaults_when_missing() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        // Delete the metadata file to simulate missing
+        fs::remove_file(temp_dir.path().join(".metadata.json")).unwrap();
+
+        let meta = storage.read_root_metadata().unwrap();
+        assert_eq!(meta.version, 1);
+        assert!(meta.list_order.is_empty());
+    }
+
+    // --- List operations ---
+
+    #[test]
+    fn test_create_list_already_exists() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+
+        storage.create_list("Dupes".to_string()).unwrap();
+        let result = storage.create_list("Dupes".to_string());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::InvalidData(_)));
+    }
+
+    #[test]
+    fn test_delete_list_cleans_up_root_metadata() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+
+        let list = storage.create_list("To Delete".to_string()).unwrap();
+        let meta_before = storage.read_root_metadata().unwrap();
+        assert!(meta_before.list_order.contains(&list.id));
+
+        storage.delete_list(list.id).unwrap();
+        let meta_after = storage.read_root_metadata().unwrap();
+        assert!(!meta_after.list_order.contains(&list.id));
+    }
+
+    #[test]
+    fn test_list_dir_path_nonexistent_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = init_storage(&temp_dir);
+
+        let result = storage.list_dir_path(Uuid::new_v4());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::ListNotFound(_)));
+    }
+
+    // --- Task file operations ---
+
+    #[test]
+    fn test_write_and_read_task() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+        let list = storage.create_list("Tasks".to_string()).unwrap();
+
+        let task = Task::new("Hello".to_string());
+        storage.write_task(list.id, &task).unwrap();
+
+        let read_back = storage.read_task(list.id, task.id).unwrap();
+        assert_eq!(read_back.title, "Hello");
+        assert_eq!(read_back.id, task.id);
+    }
+
+    #[test]
+    fn test_read_task_nonexistent() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+        let list = storage.create_list("Tasks".to_string()).unwrap();
+
+        let result = storage.read_task(list.id, Uuid::new_v4());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::TaskNotFound(_)));
+    }
+
+    #[test]
+    fn test_write_task_adds_to_task_order() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+        let list = storage.create_list("Tasks".to_string()).unwrap();
+
+        let t1 = Task::new("First".to_string());
+        let t2 = Task::new("Second".to_string());
+        storage.write_task(list.id, &t1).unwrap();
+        storage.write_task(list.id, &t2).unwrap();
+
+        let meta = storage.read_list_metadata(list.id).unwrap();
+        assert_eq!(meta.task_order.len(), 2);
+        assert_eq!(meta.task_order[0], t1.id);
+        assert_eq!(meta.task_order[1], t2.id);
+    }
+
+    #[test]
+    fn test_write_task_idempotent_order() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+        let list = storage.create_list("Tasks".to_string()).unwrap();
+
+        let task = Task::new("Once".to_string());
+        storage.write_task(list.id, &task).unwrap();
+        storage.write_task(list.id, &task).unwrap(); // Write again
+
+        let meta = storage.read_list_metadata(list.id).unwrap();
+        assert_eq!(meta.task_order.len(), 1); // Should not duplicate
+    }
+
+    #[test]
+    fn test_delete_task_removes_from_order() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+        let list = storage.create_list("Tasks".to_string()).unwrap();
+
+        let task = Task::new("Bye".to_string());
+        storage.write_task(list.id, &task).unwrap();
+        storage.delete_task(list.id, task.id).unwrap();
+
+        let meta = storage.read_list_metadata(list.id).unwrap();
+        assert!(!meta.task_order.contains(&task.id));
+    }
+
+    #[test]
+    fn test_list_tasks_respects_order() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+        let list = storage.create_list("Tasks".to_string()).unwrap();
+
+        let t1 = Task::new("Alpha".to_string());
+        let t2 = Task::new("Beta".to_string());
+        let t3 = Task::new("Gamma".to_string());
+        storage.write_task(list.id, &t1).unwrap();
+        storage.write_task(list.id, &t2).unwrap();
+        storage.write_task(list.id, &t3).unwrap();
+
+        // Rewrite metadata with reversed order
+        let mut meta = storage.read_list_metadata(list.id).unwrap();
+        meta.task_order = vec![t3.id, t1.id, t2.id];
+        storage.write_list_metadata(&meta).unwrap();
+
+        let tasks = storage.list_tasks(list.id).unwrap();
+        assert_eq!(tasks[0].id, t3.id);
+        assert_eq!(tasks[1].id, t1.id);
+        assert_eq!(tasks[2].id, t2.id);
+    }
+
+    #[test]
+    fn test_list_tasks_empty_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut storage = init_storage(&temp_dir);
+        let list = storage.create_list("Empty".to_string()).unwrap();
+
+        let tasks = storage.list_tasks(list.id).unwrap();
+        assert!(tasks.is_empty());
     }
 }

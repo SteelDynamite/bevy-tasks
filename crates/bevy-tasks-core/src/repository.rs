@@ -205,4 +205,191 @@ mod tests {
         repo.set_group_by_due_date(list.id, false).unwrap();
         assert!(!repo.get_group_by_due_date(list.id).unwrap());
     }
+
+    // --- Error path tests ---
+
+    #[test]
+    fn test_get_task_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+
+        let result = repo.get_task(list.id, Uuid::new_v4());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::TaskNotFound(_)));
+    }
+
+    #[test]
+    fn test_update_nonexistent_task() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+
+        let task = Task::new("Ghost".to_string());
+        let result = repo.update_task(list.id, task);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::TaskNotFound(_)));
+    }
+
+    #[test]
+    fn test_delete_nonexistent_task() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+
+        let result = repo.delete_task(list.id, Uuid::new_v4());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::TaskNotFound(_)));
+    }
+
+    #[test]
+    fn test_get_list_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let result = repo.get_list(Uuid::new_v4());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::ListNotFound(_)));
+    }
+
+    #[test]
+    fn test_delete_nonexistent_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let result = repo.delete_list(Uuid::new_v4());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::ListNotFound(_)));
+    }
+
+    #[test]
+    fn test_list_tasks_nonexistent_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let result = repo.list_tasks(Uuid::new_v4());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::ListNotFound(_)));
+    }
+
+    #[test]
+    fn test_reorder_task_not_in_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+        repo.create_task(list.id, Task::new("A".to_string())).unwrap();
+
+        let result = repo.reorder_task(list.id, Uuid::new_v4(), 0);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::TaskNotFound(_)));
+    }
+
+    #[test]
+    fn test_reorder_task_position_clamped() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+
+        let t1 = repo.create_task(list.id, Task::new("A".to_string())).unwrap();
+        let t2 = repo.create_task(list.id, Task::new("B".to_string())).unwrap();
+
+        // Position 999 should clamp to end
+        repo.reorder_task(list.id, t1.id, 999).unwrap();
+        let order = repo.get_task_order(list.id).unwrap();
+        assert_eq!(order[0], t2.id);
+        assert_eq!(order[1], t1.id);
+    }
+
+    #[test]
+    fn test_create_duplicate_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        repo.create_list("Dupes".to_string()).unwrap();
+
+        let result = repo.create_list("Dupes".to_string());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::InvalidData(_)));
+    }
+
+    #[test]
+    fn test_get_lists_empty() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert!(lists.is_empty());
+    }
+
+    #[test]
+    fn test_delete_list_removes_from_root_metadata() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let list1 = repo.create_list("A".to_string()).unwrap();
+        let list2 = repo.create_list("B".to_string()).unwrap();
+
+        repo.delete_list(list1.id).unwrap();
+
+        let lists = repo.get_lists().unwrap();
+        assert_eq!(lists.len(), 1);
+        assert_eq!(lists[0].id, list2.id);
+    }
+
+    #[test]
+    fn test_new_on_nonexistent_path() {
+        let result = TaskRepository::new(PathBuf::from("/nonexistent/path/that/does/not/exist"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_task_with_description_roundtrip() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+
+        let task = Task::new("Has Description".to_string())
+            .with_description("Some **markdown** notes".to_string());
+        let created = repo.create_task(list.id, task).unwrap();
+
+        let retrieved = repo.get_task(list.id, created.id).unwrap();
+        assert_eq!(retrieved.description, "Some **markdown** notes");
+    }
+
+    #[test]
+    fn test_task_rename_removes_old_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+
+        let mut task = repo.create_task(list.id, Task::new("Old Name".to_string())).unwrap();
+        task.title = "New Name".to_string();
+        repo.update_task(list.id, task.clone()).unwrap();
+
+        // Old file should be gone, new file should exist
+        let tasks = repo.list_tasks(list.id).unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].title, "New Name");
+
+        // Verify old .md file no longer on disk
+        let old_path = temp_dir.path().join("Test").join("Old Name.md");
+        assert!(!old_path.exists());
+    }
+
+    #[test]
+    fn test_task_order_after_delete() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+        let list = repo.create_list("Test".to_string()).unwrap();
+
+        let t1 = repo.create_task(list.id, Task::new("A".to_string())).unwrap();
+        let t2 = repo.create_task(list.id, Task::new("B".to_string())).unwrap();
+        let t3 = repo.create_task(list.id, Task::new("C".to_string())).unwrap();
+
+        repo.delete_task(list.id, t2.id).unwrap();
+
+        let order = repo.get_task_order(list.id).unwrap();
+        assert_eq!(order.len(), 2);
+        assert_eq!(order[0], t1.id);
+        assert_eq!(order[1], t3.id);
+    }
 }
