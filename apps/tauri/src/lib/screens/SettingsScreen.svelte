@@ -206,4 +206,6 @@
       </div>
     </button>
   </section>
+
+  <p class="mt-8 text-center text-xs opacity-30">Tauri v2 + Svelte</p>
 </main>

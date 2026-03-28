@@ -219,6 +219,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (_) => app.toggleDarkMode(),
             ),
           ),
+
+          const SizedBox(height: 32),
+          Center(
+            child: Text(
+              'Flutter + flutter_rust_bridge',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(77),
+              ),
+            ),
+          ),
         ],
       ),
     );
