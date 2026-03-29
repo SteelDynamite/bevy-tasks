@@ -343,7 +343,7 @@
             ondragover={(e) => handleDragOver(e, task.id)}
             ondragend={handleDragEnd}
             ondrop={(e) => handleDrop(e, task.id)}
-            class="transition-all duration-150 {dragId === task.id ? 'opacity-30' : ''} {dragOverId === task.id && dragId !== task.id ? 'border-t-2 border-t-primary' : ''}"
+            class="{dragId === task.id ? 'opacity-30' : ''} {dragOverId === task.id && dragId !== task.id ? 'border-t-2 border-t-primary' : ''}"
           >
             <TaskItem {task} />
           </div>

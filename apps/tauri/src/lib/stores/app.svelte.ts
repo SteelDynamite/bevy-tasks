@@ -162,7 +162,13 @@ async function toggleTask(taskId: string) {
       listId: activeListId,
       taskId,
     });
-    tasks = tasks.map((t) => (t.id === taskId ? updated : t));
+    // Move to top of list locally, then persist order in background
+    if (updated.status === "backlog") {
+      tasks = [updated, ...tasks.filter((t) => t.id !== taskId)];
+      invoke("reorder_task", { listId: activeListId, taskId, newPosition: 0 }).catch(() => {});
+    } else {
+      tasks = tasks.map((t) => (t.id === taskId ? updated : t));
+    }
   } catch (e) {
     error = String(e);
   }

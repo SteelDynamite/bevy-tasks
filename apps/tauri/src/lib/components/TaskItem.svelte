@@ -1,5 +1,6 @@
 <script lang="ts" module>
   let editingTaskId = $state<string | null>(null);
+  export const animateInIds = new Set<string>();
 </script>
 
 <script lang="ts">
@@ -18,8 +19,31 @@
   let titleInputEl = $state<HTMLInputElement | null>(null);
   let showMenu = $state(false);
   let menuEl = $state<HTMLDivElement | null>(null);
+  let transitioning = $state(false);
+  let animatingIn = $state(false);
 
   let isCompleted = $derived(task.status === "completed");
+
+  $effect(() => {
+    // Check on status change whether this task should animate in
+    const _ = task.status; // track reactively
+    if (animateInIds.has(task.id)) {
+      animateInIds.delete(task.id);
+      animatingIn = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          animatingIn = false;
+        });
+      });
+    }
+  });
+
+  async function handleToggle() {
+    transitioning = true;
+    animateInIds.add(task.id);
+    await new Promise((r) => setTimeout(r, 200));
+    await app.toggleTask(task.id);
+  }
 
   function handleMenuClickOutside(e: MouseEvent) {
     if (showMenu && menuEl && !menuEl.contains(e.target as Node)) {
@@ -39,7 +63,6 @@
     editingTaskId = task.id;
     editTitle = task.title;
     editDesc = task.description;
-    // Wait for expand/contract animation (200ms) to settle before focusing
     setTimeout(() => titleInputEl?.focus(), 220);
   }
 
@@ -54,7 +77,6 @@
 
   function handleFocusOut(e: FocusEvent) {
     if (containerEl?.contains(e.relatedTarget as Node)) return;
-    // Delay so that clicking a different task can set editingTaskId first
     requestAnimationFrame(() => {
       if (editingTaskId === task.id) save();
     });
@@ -74,7 +96,10 @@
 
   function handleTouchEnd() {
     if (Math.abs(swipeX) > 100) {
-      app.toggleTask(task.id);
+      swipeX = 0;
+      swiping = false;
+      handleToggle();
+      return;
     }
     swipeX = 0;
     swiping = false;
@@ -91,6 +116,10 @@
   }
 </script>
 
+<div
+  class="grid transition-[grid-template-rows,opacity] duration-300 ease-out {animatingIn || transitioning ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}"
+>
+<div class="overflow-hidden">
 <div
   bind:this={containerEl}
   class="relative {showMenu ? 'z-40' : ''}"
@@ -112,13 +141,13 @@
   <!-- Task content -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="group relative flex items-start gap-3 bg-surface-light px-4 py-3 transition-colors hover:bg-black/5 dark:bg-surface-dark dark:hover:bg-white/5"
+    class="group relative flex items-start gap-3 bg-surface-light px-4 py-3 hover:bg-black/5 dark:bg-surface-dark dark:hover:bg-white/5"
     style="transform: translateX({swipeX}px); transition: {swiping ? 'none' : 'transform 0.2s ease-out'}"
     onmousedown={startEditing}
   >
     <!-- Checkbox -->
     <button
-      onmousedown={(e) => { e.stopPropagation(); app.toggleTask(task.id) }}
+      onmousedown={(e) => { e.stopPropagation(); handleToggle(); }}
       class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors {isCompleted
         ? 'border-primary bg-primary'
         : 'border-gray-400 dark:border-gray-500'}"
@@ -167,7 +196,7 @@
             class="mt-1 w-full resize-none bg-transparent text-xs opacity-60 outline-none"
             tabindex={editing ? 0 : -1}
             onkeydown={(e) => { if (e.key === "Escape") { editTitle = task.title; editDesc = task.description; editingTaskId = null; } }}
-          />
+          ></textarea>
         </div>
       </div>
     </div>
@@ -198,4 +227,6 @@
         {/if}
       </div>
   </div>
+</div>
+</div>
 </div>
