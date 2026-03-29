@@ -140,12 +140,13 @@ async function deleteList(id: string) {
   }
 }
 
-async function createTask(title: string) {
+async function createTask(title: string, description?: string) {
   if (!activeListId) return;
   try {
     const task = await invoke<Task>("create_task", {
       listId: activeListId,
       title,
+      description: description ?? "",
     });
     tasks = [...tasks, task];
     error = null;
