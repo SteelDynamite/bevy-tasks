@@ -178,6 +178,16 @@ async function updateTask(task: Task) {
   }
 }
 
+async function reorderTask(taskId: string, newPosition: number) {
+  if (!activeListId) return;
+  try {
+    await invoke("reorder_task", { listId: activeListId, taskId, newPosition });
+    await loadTasks();
+  } catch (e) {
+    error = String(e);
+  }
+}
+
 async function deleteTask(taskId: string) {
   if (!activeListId) return;
   try {
@@ -278,6 +288,7 @@ export const app = {
   createTask,
   toggleTask,
   updateTask,
+  reorderTask,
   deleteTask,
   triggerSync,
   toggleDarkMode,

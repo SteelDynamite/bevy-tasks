@@ -1,6 +1,8 @@
 <script lang="ts">
   import { app } from "../stores/app.svelte";
 
+  let { onclose }: { onclose?: () => void } = $props();
+
   let webdavUrl = $state("");
   let webdavUser = $state("");
   let webdavPass = $state("");
@@ -47,7 +49,7 @@
   class="flex items-center gap-3 border-b border-border-light px-4 py-3 dark:border-border-dark"
 >
   <button
-    onclick={() => app.setScreen("tasks")}
+    onclick={() => onclose?.()}
     class="rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
   >
     <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -60,7 +62,7 @@
   <h1 class="text-lg font-bold">Settings</h1>
 </header>
 
-<main class="overflow-y-auto p-4" style="height: calc(100vh - 57px)">
+<main class="flex-1 overflow-y-auto p-4">
   <!-- Workspaces -->
   <section class="mb-6">
     <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide opacity-50">

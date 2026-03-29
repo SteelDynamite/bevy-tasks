@@ -2,12 +2,26 @@
   import { app } from "../stores/app.svelte";
   import TaskItem from "../components/TaskItem.svelte";
   import NewTaskInput, { newTaskState } from "../components/NewTaskInput.svelte";
+  import SettingsScreen from "./SettingsScreen.svelte";
 
   let showDrawer = $state(false);
+  let showSettings = $state(false);
   let showNewList = $state(false);
   let newListName = $state("");
   let showCompleted = $state(true);
   let confirmDeleteList = $state<string | null>(null);
+  let dragId = $state<string | null>(null);
+  let dragOverId = $state<string | null>(null);
+  let resizing = $state(false);
+  let resizeTimer: ReturnType<typeof setTimeout>;
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("resize", () => {
+      resizing = true;
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => (resizing = false), 150);
+    });
+  }
 
   async function handleNewList() {
     if (!newListName.trim()) return;
@@ -23,20 +37,81 @@
     showDrawer = false;
   }
 
+  function handleDragStart(e: DragEvent, taskId: string) {
+    dragId = taskId;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", taskId);
+      // Create an unclipped drag image
+      const el = (e.target as HTMLElement).closest("[draggable]") as HTMLElement;
+      if (el) {
+        const clone = el.cloneNode(true) as HTMLElement;
+        clone.style.width = `${el.offsetWidth}px`;
+        clone.style.position = "absolute";
+        clone.style.top = "-9999px";
+        clone.style.left = "-9999px";
+        if (app.darkMode) {
+          clone.classList.add("dark");
+          clone.style.backgroundColor = "var(--color-surface-dark)";
+          clone.style.color = "var(--color-text-dark)";
+        }
+        clone.style.opacity = "0.85";
+        clone.style.borderRadius = "8px";
+        clone.style.overflow = "hidden";
+        clone.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+        document.body.appendChild(clone);
+        e.dataTransfer.setDragImage(clone, e.offsetX, e.offsetY);
+        requestAnimationFrame(() => clone.remove());
+      }
+    }
+  }
+
+  function handleDragOver(e: DragEvent, taskId: string) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    dragOverId = taskId;
+  }
+
+  function handleDragEnd() {
+    dragId = null;
+    dragOverId = null;
+  }
+
+  async function handleDrop(e: DragEvent, targetId: string) {
+    e.preventDefault();
+    if (!dragId || dragId === targetId) { handleDragEnd(); return; }
+    const targetIndex = app.pendingTasks.findIndex((t) => t.id === targetId);
+    if (targetIndex >= 0) await app.reorderTask(dragId, targetIndex);
+    handleDragEnd();
+  }
+
   function closeDrawer() {
     showDrawer = false;
     showNewList = false;
     confirmDeleteList = null;
   }
+
+  function openSettings() {
+    showSettings = true;
+    showDrawer = false;
+  }
+
+  function closeSettings() {
+    showSettings = false;
+  }
+
+  let translateX = $derived(showDrawer ? '0' : showSettings ? '-160vw' : '-80vw');
 </script>
 
-<!-- Sliding container: drawer + main content move as one piece -->
+<!-- Viewport clip -->
+<div class="h-screen w-screen overflow-hidden">
+<!-- Sliding container: left drawer + main content + settings panel move as one piece -->
 <div
-  class="flex h-screen transition-transform duration-250 ease-out"
-  style="width: calc(100vw + 18rem); transform: translateX({showDrawer ? '0' : '-18rem'})"
+  class="flex h-full ease-out {resizing ? '' : 'transition-transform duration-250'}"
+  style="width: calc(100vw + 160vw); transform: translateX({translateX})"
 >
   <!-- Drawer panel (always rendered, sits to the left) -->
-  <div class="flex h-full w-72 shrink-0 flex-col bg-surface-light dark:bg-surface-dark">
+  <div class="flex h-full w-[80vw] shrink-0 flex-col bg-surface-light dark:bg-surface-dark">
     <!-- Drawer header -->
     <div class="border-b border-border-light px-4 py-4 dark:border-border-dark">
       <p class="text-xs text-text-secondary-light dark:text-text-secondary-dark">
@@ -119,13 +194,13 @@
 
   <!-- Main content panel -->
   <div class="relative flex h-full w-screen shrink-0 flex-col bg-surface-light dark:bg-surface-dark">
-    <!-- Dim overlay + shadow when drawer is open -->
+    <!-- Dim overlay + shadow when drawer or settings is open -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="absolute inset-0 z-30 transition-opacity duration-250 ease-out {showDrawer ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}"
-      style="box-shadow: inset 8px 0 24px rgba(0,0,0,0.4); background: rgba(0,0,0,0.4)"
-      onclick={closeDrawer}
-      onkeydown={(e) => { if (e.key === "Escape") closeDrawer(); }}
+      class="absolute inset-0 z-30 transition-opacity duration-250 ease-out {showDrawer || showSettings ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}"
+      style="box-shadow: {showDrawer ? 'inset 8px 0 24px rgba(0,0,0,0.4)' : showSettings ? 'inset -8px 0 24px rgba(0,0,0,0.4)' : 'none'}; background: rgba(0,0,0,0.4)"
+      onclick={() => { if (showDrawer) closeDrawer(); if (showSettings) closeSettings(); }}
+      onkeydown={(e) => { if (e.key === "Escape") { closeDrawer(); closeSettings(); } }}
     ></div>
     <!-- Header -->
     <header
@@ -154,7 +229,7 @@
           <div class="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
         {/if}
         <button
-          onclick={() => app.setScreen("settings")}
+          onclick={openSettings}
           class="rounded-lg p-2 hover:bg-black/5 dark:hover:bg-white/10"
           title="Settings"
         >
@@ -182,7 +257,17 @@
         </div>
       {:else}
         {#each app.pendingTasks as task (task.id)}
-          <TaskItem {task} />
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            draggable="true"
+            ondragstart={(e) => handleDragStart(e, task.id)}
+            ondragover={(e) => handleDragOver(e, task.id)}
+            ondragend={handleDragEnd}
+            ondrop={(e) => handleDrop(e, task.id)}
+            class="transition-all duration-150 {dragId === task.id ? 'opacity-30' : ''} {dragOverId === task.id && dragId !== task.id ? 'border-t-2 border-t-primary' : ''}"
+          >
+            <TaskItem {task} />
+          </div>
         {/each}
 
         {#if app.pendingTasks.length === 0}
@@ -217,7 +302,7 @@
 
     <!-- FAB button, slides with main content -->
     <div
-      class="pointer-events-none absolute bottom-6 left-0 right-0 z-30 flex justify-center transition-all duration-250 ease-out {newTaskState.open ? 'opacity-0 scale-75' : ''} {showDrawer ? 'translate-y-24 opacity-0' : 'translate-y-0 opacity-100'}"
+      class="pointer-events-none absolute bottom-6 left-0 right-0 z-30 flex justify-center transition-all duration-250 ease-out {newTaskState.open ? 'opacity-0 scale-75' : ''} {showDrawer || showSettings ? 'translate-y-24 opacity-0' : 'translate-y-0 opacity-100'}"
     >
       <button
         onclick={() => { if (app.activeListId) newTaskState.open = true; }}
@@ -230,6 +315,12 @@
       </button>
     </div>
   </div>
+
+  <!-- Settings panel (sits to the right of main content) -->
+  <div class="flex h-full w-[80vw] shrink-0 flex-col bg-surface-light dark:bg-surface-dark">
+    <SettingsScreen onclose={closeSettings} />
+  </div>
+</div>
 </div>
 
 <!-- Toast overlay (outside sliding container so it stays centered) -->

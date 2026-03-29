@@ -1,17 +1,49 @@
+<script lang="ts" module>
+  let editingTaskId = $state<string | null>(null);
+</script>
+
 <script lang="ts">
   import type { Task } from "../types";
   import { app } from "../stores/app.svelte";
 
   let { task }: { task: Task } = $props();
 
-  let editing = $state(false);
   let editTitle = $state(task.title);
   let editDesc = $state(task.description);
+  let editing = $derived(editingTaskId === task.id);
   let touchStartX = $state(0);
   let swipeX = $state(0);
   let swiping = $state(false);
+  let containerEl = $state<HTMLDivElement | null>(null);
+  let titleInputEl = $state<HTMLInputElement | null>(null);
 
   let isCompleted = $derived(task.status === "completed");
+
+  function startEditing() {
+    if (editing) return;
+    editingTaskId = task.id;
+    editTitle = task.title;
+    editDesc = task.description;
+    // Wait for expand/contract animation (200ms) to settle before focusing
+    setTimeout(() => titleInputEl?.focus(), 220);
+  }
+
+  async function save() {
+    if (editingTaskId !== task.id) return;
+    editingTaskId = null;
+    const trimmed = editTitle.trim();
+    if (!trimmed) { editTitle = task.title; return; }
+    if (trimmed === task.title && editDesc === task.description) return;
+    await app.updateTask({ ...task, title: trimmed, description: editDesc });
+  }
+
+  function handleFocusOut(e: FocusEvent) {
+    if (containerEl?.contains(e.relatedTarget as Node)) return;
+    // Delay so that clicking a different task can set editingTaskId first
+    requestAnimationFrame(() => {
+      if (editingTaskId === task.id) save();
+    });
+  }
 
   function handleTouchStart(e: TouchEvent) {
     touchStartX = e.touches[0].clientX;
@@ -21,7 +53,6 @@
   function handleTouchMove(e: TouchEvent) {
     if (!swiping) return;
     const dx = e.touches[0].clientX - touchStartX;
-    // Only allow left swipe for pending, right swipe for completed
     if (isCompleted) swipeX = Math.max(0, dx);
     else swipeX = Math.min(0, dx);
   }
@@ -32,13 +63,6 @@
     }
     swipeX = 0;
     swiping = false;
-  }
-
-  async function saveEdit() {
-    if (!editTitle.trim()) return;
-    const updated = { ...task, title: editTitle.trim(), description: editDesc };
-    await app.updateTask(updated);
-    editing = false;
   }
 
   function formatDate(iso: string): string {
@@ -53,6 +77,7 @@
 </script>
 
 <div
+  bind:this={containerEl}
   class="relative overflow-hidden border-b border-border-light dark:border-border-dark"
   ontouchstart={handleTouchStart}
   ontouchmove={handleTouchMove}
@@ -70,13 +95,15 @@
   {/if}
 
   <!-- Task content -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="relative flex items-start gap-3 bg-surface-light px-4 py-3 dark:bg-surface-dark"
+    class="relative flex cursor-pointer items-start gap-3 bg-surface-light px-4 py-3 transition-colors hover:bg-black/5 dark:bg-surface-dark dark:hover:bg-white/5"
     style="transform: translateX({swipeX}px); transition: {swiping ? 'none' : 'transform 0.2s ease-out'}"
+    onmousedown={startEditing}
   >
     <!-- Checkbox -->
     <button
-      onclick={() => app.toggleTask(task.id)}
+      onmousedown={(e) => { e.stopPropagation(); app.toggleTask(task.id) }}
       class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors {isCompleted
         ? 'border-primary bg-primary'
         : 'border-gray-400 dark:border-gray-500'}"
@@ -92,40 +119,16 @@
     </button>
 
     <!-- Content -->
-    {#if editing}
-      <div class="min-w-0 flex-1">
+    <div class="min-w-0 flex-1" onfocusout={handleFocusOut}>
+      {#if editing}
         <input
           type="text"
+          bind:this={titleInputEl}
           bind:value={editTitle}
           class="w-full bg-transparent text-sm font-medium outline-none"
-          onkeydown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") editing = false; }}
+          onkeydown={(e) => { if (e.key === "Enter") (e.target as HTMLElement).blur(); if (e.key === "Escape") { editTitle = task.title; editDesc = task.description; editingTaskId = null; } }}
         />
-        <textarea
-          bind:value={editDesc}
-          placeholder="Add description…"
-          rows="2"
-          class="mt-1 w-full resize-none bg-transparent text-xs opacity-60 outline-none"
-        />
-        <div class="mt-1 flex gap-2">
-          <button
-            onclick={saveEdit}
-            class="rounded px-2 py-1 text-xs font-medium text-primary"
-          >
-            Save
-          </button>
-          <button
-            onclick={() => (editing = false)}
-            class="rounded px-2 py-1 text-xs opacity-60"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    {:else}
-      <button
-        onclick={() => { editing = true; editTitle = task.title; editDesc = task.description; }}
-        class="min-w-0 flex-1 text-left"
-      >
+      {:else}
         <p class="text-sm {isCompleted ? 'line-through opacity-50' : 'font-medium'}">
           {task.title}
         </p>
@@ -137,13 +140,27 @@
             {formatDate(task.due_date)}
           </span>
         {/if}
-      </button>
-    {/if}
+      {/if}
+
+      <!-- Expandable edit description -->
+      <div class="grid transition-[grid-template-rows,opacity] duration-200 ease-out {editing ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}">
+        <div class="overflow-hidden">
+          <textarea
+            bind:value={editDesc}
+            placeholder="Add description…"
+            rows="2"
+            class="mt-1 w-full resize-none bg-transparent text-xs opacity-60 outline-none"
+            tabindex={editing ? 0 : -1}
+            onkeydown={(e) => { if (e.key === "Escape") { editTitle = task.title; editDesc = task.description; editingTaskId = null; } }}
+          />
+        </div>
+      </div>
+    </div>
 
     <!-- Delete -->
     {#if !editing}
       <button
-        onclick={() => app.deleteTask(task.id)}
+        onmousedown={(e) => { e.stopPropagation(); app.deleteTask(task.id) }}
         class="shrink-0 rounded p-1 opacity-0 transition-opacity hover:opacity-60 group-hover:opacity-30"
         style="opacity: 0.15"
         title="Delete"

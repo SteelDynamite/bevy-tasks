@@ -25,10 +25,8 @@
 
     {#if app.screen === "setup"}
       <SetupScreen />
-    {:else if app.screen === "tasks"}
+    {:else}
       <TasksScreen />
-    {:else if app.screen === "settings"}
-      <SettingsScreen />
     {/if}
   </div>
 </div>
