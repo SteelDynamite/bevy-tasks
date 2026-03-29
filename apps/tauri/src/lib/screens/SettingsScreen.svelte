@@ -7,7 +7,6 @@
   let webdavUser = $state("");
   let webdavPass = $state("");
   let testStatus = $state<"idle" | "testing" | "ok" | "fail">("idle");
-  let confirmRemove = $state<string | null>(null);
 
   async function testConnection() {
     testStatus = "testing";
@@ -39,10 +38,6 @@
     }
   }
 
-  async function handleRemoveWorkspace(name: string) {
-    await app.removeWorkspace(name);
-    confirmRemove = null;
-  }
 </script>
 
 <header
@@ -63,75 +58,6 @@
 </header>
 
 <main class="flex-1 overflow-y-auto p-4">
-  <!-- Workspaces -->
-  <section class="mb-6">
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide opacity-50">
-      Workspaces
-    </h2>
-    {#if app.config}
-      {#each Object.entries(app.config.workspaces) as [name, ws]}
-        <div
-          class="mb-2 rounded-xl border border-border-light p-3 dark:border-border-dark"
-        >
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="font-medium {name === app.config.current_workspace ? 'text-primary' : ''}">
-                {name}
-              </p>
-              <p class="text-xs opacity-50">{ws.path}</p>
-            </div>
-            <div class="flex gap-1">
-              {#if name !== app.config.current_workspace}
-                <button
-                  onclick={() => app.switchWorkspace(name)}
-                  class="rounded-lg px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"
-                >
-                  Switch
-                </button>
-              {/if}
-              {#if confirmRemove === name}
-                <button
-                  onclick={() => handleRemoveWorkspace(name)}
-                  class="rounded-lg px-3 py-1.5 text-xs font-medium text-danger"
-                >
-                  Confirm
-                </button>
-                <button
-                  onclick={() => (confirmRemove = null)}
-                  class="rounded-lg px-3 py-1.5 text-xs opacity-60"
-                >
-                  Cancel
-                </button>
-              {:else}
-                <button
-                  onclick={() => (confirmRemove = name)}
-                  class="rounded-lg px-3 py-1.5 text-xs opacity-40 hover:text-danger hover:opacity-100"
-                >
-                  Remove
-                </button>
-              {/if}
-            </div>
-          </div>
-          {#if ws.webdav_url}
-            <p class="mt-1 text-xs opacity-40">Sync: {ws.webdav_url}</p>
-          {/if}
-          {#if ws.last_sync}
-            <p class="text-xs opacity-40">
-              Last synced: {new Date(ws.last_sync).toLocaleString()}
-            </p>
-          {/if}
-        </div>
-      {/each}
-    {/if}
-
-    <button
-      onclick={() => app.setScreen("setup")}
-      class="mt-2 rounded-lg px-3 py-2 text-sm text-primary hover:bg-primary/5"
-    >
-      + Add workspace
-    </button>
-  </section>
-
   <!-- WebDAV Sync -->
   <section class="mb-6">
     <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide opacity-50">

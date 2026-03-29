@@ -3,7 +3,7 @@
   import { app } from "./lib/stores/app.svelte";
   import SetupScreen from "./lib/screens/SetupScreen.svelte";
   import TasksScreen from "./lib/screens/TasksScreen.svelte";
-  import SettingsScreen from "./lib/screens/SettingsScreen.svelte";
+
 
   onMount(() => {
     app.loadConfig();
