@@ -692,24 +692,32 @@ WorkspaceConfig {
 
 ### Features
 
-- [ ] Tauri v2 + Svelte 5 + Tailwind CSS 4 framework integration
-- [ ] Workspace setup dialog on first launch
-- [ ] Workspace selector in toolbar
-- [ ] Quick-switch between workspaces
-- [ ] Basic task list view
-- [ ] Create new tasks
-- [ ] Edit existing tasks
-- [ ] Delete tasks
-- [ ] Mark tasks complete/incomplete
-- [ ] Settings screen (manage workspaces, WebDAV config)
+- [x] Tauri v2 + Svelte 5 + Tailwind CSS 4 framework integration
+- [x] Workspace setup dialog on first launch
+- [x] Workspace selector (drop-up menu in drawer footer)
+- [x] Quick-switch between workspaces
+- [x] Basic task list view with pending/completed sections
+- [x] Create new tasks (FAB + bottom toast sheet with title/description)
+- [x] Edit existing tasks (inline editing, auto-save on blur)
+- [x] Delete tasks (kebab menu → delete)
+- [x] Mark tasks complete/incomplete with animated transitions
+- [x] Drag-and-drop task reordering
+- [x] Sliding lists drawer (80vw, left side)
+- [x] Settings popup overlay (WebDAV config, dark mode toggle)
+- [x] Dark mode (GNOME-style neutral theme, cyan-blue accent)
+- [x] Animated completed section show/hide
+- [ ] Due date picker/editor
+- [ ] WebDAV setup flow with credentials
 - [ ] Sync status indicators (per workspace)
-- [ ] Desktop support (Windows, Linux, macOS)
+- [ ] Push/pull sync mode selection
+- [ ] List/workspace rename
+- [ ] Desktop packaging (Windows, Linux, macOS)
 
 ### Deliverables
 
-- [ ] Functional desktop GUI app
-- [ ] Sub-300ms startup time
-- [ ] Clean, minimal UI
+- [x] Functional desktop GUI app (Linux verified, Wayland native)
+- [ ] Sub-300ms startup time (not yet measured/optimized)
+- [x] Clean, minimal UI
 - [ ] Feature parity with CLI
 
 ### Build & Release
@@ -802,23 +810,23 @@ Tauri v2 supports iOS and Android natively. The same Svelte frontend and Rust ba
 ### Features
 
 #### Desktop & Mobile
-- [ ] Multiple task lists (folders)
-- [ ] Switch between lists
+- [x] Multiple task lists (folders)
+- [x] Switch between lists
 - [ ] Subtasks support
 - [ ] Due dates with date picker
 - [ ] Rich markdown editor for task notes
 - [ ] Move tasks between lists
 - [ ] Change storage folder location in settings
 - [ ] Search functionality
-- [ ] Theme selection (light/dark mode)
+- [x] Theme selection (light/dark mode)
 
 #### Desktop-Specific
-- [ ] Drag & drop reordering
+- [x] Drag & drop reordering
 - [ ] Keyboard shortcuts
 - [ ] Multiple windows (optional)
 
 #### Mobile-Specific
-- [ ] Swipe gestures (swipe to complete, swipe to delete)
+- [x] Swipe gestures (swipe to complete, swipe to delete)
 - [ ] Pull-to-refresh
 - [ ] Touch-optimized UI elements
 - [ ] Larger touch targets

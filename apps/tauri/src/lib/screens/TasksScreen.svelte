@@ -24,6 +24,7 @@
   }
   let newListName = $state("");
   let showCompleted = $state(true);
+  let completedVisible = $state(true);
   let listMenuId = $state<string | null>(null);
   let wsMenuName = $state<string | null>(null);
   let dragId = $state<string | null>(null);
@@ -356,8 +357,16 @@
         {#if app.completedTasks.length > 0}
           <div class="h-4"></div>
           <button
-            onclick={() => (showCompleted = !showCompleted)}
-            class="flex w-full items-center justify-between border-t border-border-light px-4 py-3 text-sm font-medium text-text-secondary-light transition-colors hover:bg-black/5 dark:border-border-dark dark:text-text-secondary-dark dark:hover:bg-white/5"
+            onclick={() => {
+              if (showCompleted) {
+                showCompleted = false;
+                setTimeout(() => (completedVisible = false), 300);
+              } else {
+                completedVisible = true;
+                requestAnimationFrame(() => (showCompleted = true));
+              }
+            }}
+            class="relative z-10 flex w-full items-center justify-between border-t border-border-light bg-surface-light px-4 py-3 text-sm font-medium text-text-secondary-light transition-colors hover:bg-black/5 dark:border-border-dark dark:bg-surface-dark dark:text-text-secondary-dark dark:hover:bg-white/5"
           >
             Completed ({app.completedTasks.length})
             <svg
@@ -371,10 +380,12 @@
               />
             </svg>
           </button>
-          {#if showCompleted}
-            {#each app.completedTasks as task (task.id)}
-              <TaskItem {task} />
-            {/each}
+          {#if completedVisible}
+            <div class="transition-all duration-300 ease-out {showCompleted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}">
+              {#each app.completedTasks as task (task.id)}
+                <TaskItem {task} />
+              {/each}
+            </div>
           {/if}
         {/if}
       {/if}
