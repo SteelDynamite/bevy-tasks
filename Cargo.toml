@@ -2,11 +2,9 @@
 members = [
     "crates/bevy-tasks-core",
     "crates/bevy-tasks-cli",
-    "crates/bevy-tasks-gui",
 ]
 exclude = [
     "apps/tauri/src-tauri",
-    "apps/flutter/rust",
 ]
 resolver = "2"
 

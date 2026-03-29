@@ -194,12 +194,16 @@ fn list_tasks(
 fn create_task(
     list_id: String,
     title: String,
+    description: Option<String>,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<Task, String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    let task = Task::new(title);
+    let mut task = Task::new(title);
+    if let Some(desc) = description.filter(|d| !d.is_empty()) {
+        task.description = desc;
+    }
     s.repo
         .as_mut()
         .unwrap()

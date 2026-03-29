@@ -19,8 +19,9 @@ A **local-first, cross-platform tasks application** inspired by Google Tasks. Bu
 
 ## Resources
 
-- [Bevy Documentation](https://bevyengine.org/)
-- [egui Documentation](https://docs.rs/egui/)
+- [Tauri Documentation](https://v2.tauri.app/)
+- [Svelte Documentation](https://svelte.dev/)
+- [Tailwind CSS Documentation](https://tailwindcss.com/)
 - [WebDAV RFC 4918](https://datatracker.ietf.org/doc/html/rfc4918)
 - [Google Tasks API](https://developers.google.com/tasks) (for importer reference)
 
@@ -44,10 +45,11 @@ bevy-tasks/
 ├── Cargo.toml                    # Workspace definition
 ├── PLAN.md
 ├── README.md
+├── apps/
+│   └── tauri/                    # Tauri GUI (Svelte + Tailwind)
 ├── crates/
 │   ├── bevy-tasks-core/          # Core library (backend)
-│   ├── bevy-tasks-cli/           # CLI frontend
-│   └── bevy-tasks-gui/           # GUI frontend (Phase 3+)
+│   └── bevy-tasks-cli/           # CLI frontend
 └── docs/
 ```
 
@@ -226,7 +228,9 @@ pub trait Storage {
 members = [
     "crates/bevy-tasks-core",
     "crates/bevy-tasks-cli",
-    "crates/bevy-tasks-gui",
+]
+exclude = [
+    "apps/tauri/src-tauri",
 ]
 resolver = "2"
 
@@ -590,43 +594,50 @@ Workspace: shared
 
 ### Architecture
 
-#### Frontend Framework: egui
+#### Frontend Framework: Tauri v2 + Svelte 5 + Tailwind CSS 4
 
-**Decision**: Use egui (immediate mode GUI) for MVP
+**Decision**: Use Tauri v2 with Svelte and Tailwind for the GUI
 
-**Why egui?**
-- Fast development with rich built-in widgets
-- Excellent text editing support out of the box
-- Small binary size (~2-3MB stripped)
-- Fast startup time (100-200ms target)
-- Mature and stable
-- Simple immediate-mode API
-- Cross-platform (desktop AND mobile)
-- Easy integration with `bevy-tasks-core`
+**Why Tauri?**
+- Native Rust backend — direct integration with `bevy-tasks-core`
+- Svelte 5 for reactive, performant UI with minimal boilerplate
+- Tailwind CSS 4 for rapid, consistent styling
+- Small binary size (~5-10MB)
+- Cross-platform (Windows, Linux, macOS; mobile in Tauri v2)
+- Web technologies for UI = rich ecosystem, easy to iterate
+- Tauri commands expose core library directly to the frontend
 
-#### GUI Crate Structure
+#### GUI Structure
 
 ```
-crates/bevy-tasks-gui/
-├── Cargo.toml
-├── src/
-│   ├── main.rs           # App entry point
-│   ├── app.rs            # egui app setup
-│   ├── ui/
-│   │   ├── mod.rs
-│   │   ├── screens/
-│   │   │   ├── task_list.rs
-│   │   │   ├── task_detail.rs
-│   │   │   └── settings.rs
-│   │   └── components/
-│   │       ├── task_item.rs
-│   │       ├── task_input.rs
-│   │       └── list_selector.rs
-│   └── state.rs          # UI state management
-├── assets/
-│   ├── fonts/
-│   └── icons/
-└── README.md
+apps/tauri/
+├── package.json
+├── svelte.config.js
+├── vite.config.ts
+├── tsconfig.json
+├── index.html
+├── src/                          # Svelte frontend
+│   ├── main.ts
+│   ├── app.css
+│   ├── App.svelte
+│   └── lib/
+│       ├── screens/
+│       │   ├── TasksScreen.svelte
+│       │   ├── SettingsScreen.svelte
+│       │   └── SetupScreen.svelte
+│       ├── components/
+│       │   ├── TaskItem.svelte
+│       │   ├── NewTaskInput.svelte
+│       │   └── ListSelector.svelte
+│       └── stores/
+│           └── app.ts
+└── src-tauri/                    # Rust backend (Tauri commands)
+    ├── Cargo.toml
+    ├── tauri.conf.json
+    └── src/
+        ├── main.rs
+        ├── commands.rs           # Tauri command handlers
+        └── lib.rs
 ```
 
 #### First Run Experience
@@ -661,68 +672,62 @@ WorkspaceConfig {
 }
 ```
 
-### Dependencies
-
-**bevy-tasks-gui/Cargo.toml**:
-```toml
-[package]
-name = "bevy-tasks-gui"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-bevy-tasks-core = { path = "../bevy-tasks-core" }
-anyhow = { workspace = true }
-
-# egui for Phase 3-6
-eframe = "0.31"  # egui framework with native windowing
-egui = "0.31"    # Core egui library
-```
-
 ### Performance Strategy
 
 **Startup Sequence**:
-1. Initialize eframe window (< 50ms)
-2. Load config from disk (< 20ms)
-3. Render empty UI (first frame < 100ms)
+1. Initialize Tauri window + load Svelte app (< 100ms)
+2. Load config from disk via Tauri command (< 20ms)
+3. Render UI (first paint < 150ms)
 4. Load current task list in background
 5. Update UI as tasks load
 6. Start WebDAV sync in background (if configured)
 
-**Target**: < 200ms cold start on desktop
+**Target**: < 300ms cold start on desktop
 
 **Optimizations**:
 - Lazy data loading (load visible tasks first)
-- Background operations for sync
+- Background operations for sync via async Tauri commands
 - Efficient file I/O (stream large files)
-- Minimal dependencies
+- Svelte's compiled reactivity for minimal DOM updates
 
 ### Features
 
-- [ ] egui framework integration
-- [ ] Workspace setup dialog on first launch
-- [ ] Workspace selector in toolbar
-- [ ] Quick-switch between workspaces
-- [ ] Basic task list view
-- [ ] Create new tasks
-- [ ] Edit existing tasks
-- [ ] Delete tasks
-- [ ] Mark tasks complete/incomplete
-- [ ] Settings screen (manage workspaces, WebDAV config)
+- [x] Tauri v2 + Svelte 5 + Tailwind CSS 4 framework integration
+- [x] Workspace setup dialog on first launch
+- [x] Workspace selector (drop-up menu in drawer footer)
+- [x] Quick-switch between workspaces
+- [x] Basic task list view with pending/completed sections
+- [x] Create new tasks (FAB + bottom toast sheet with title/description)
+- [x] Edit existing tasks (inline editing, auto-save on blur)
+- [x] Delete tasks (kebab menu → delete)
+- [x] Mark tasks complete/incomplete with animated transitions
+- [x] Drag-and-drop task reordering
+- [x] Sliding lists drawer (80vw, left side)
+- [x] Settings popup overlay (WebDAV config, dark mode toggle)
+- [x] Dark mode (GNOME-style neutral theme, cyan-blue accent)
+- [x] Animated completed section show/hide
+- [ ] Due date picker/editor (backend supports it, needs date input in new task toast + inline editing)
+- [ ] WebDAV setup flow with credentials (settings panel has fields, triggerSync needs to pull creds from config)
+- [ ] List/workspace rename (needs `rename_list` added to bevy-tasks-core first)
+- [ ] Keyboard shortcuts (Escape to close drawers/menus, tab navigation, Enter behaviors)
 - [ ] Sync status indicators (per workspace)
-- [ ] Desktop support (Windows, Linux, macOS)
+- [ ] Push/pull sync mode selection
+- [ ] Group-by-due-date toggle per list
+- [ ] Subtask hierarchy (data model exists, needs UI)
+- [ ] Search/filter tasks
+- [ ] Desktop packaging (Windows, Linux, macOS)
 
 ### Deliverables
 
-- [ ] Functional desktop GUI app
-- [ ] Sub-200ms startup time
-- [ ] Clean, minimal UI
+- [x] Functional desktop GUI app (Linux verified, Wayland native)
+- [ ] Sub-300ms startup time (not yet measured/optimized)
+- [x] Clean, minimal UI
 - [ ] Feature parity with CLI
 
 ### Build & Release
 
 **Distribution**:
-- Linux: AppImage, .tar.gz
+- Linux: AppImage, .deb, .tar.gz
 - macOS: DMG
 - Windows: MSI, portable .exe
 
@@ -737,60 +742,48 @@ egui = "0.31"    # Core egui library
 ### Why Early Mobile?
 - De-risk mobile builds early in development
 - Test cross-platform architecture sooner
-- Validate egui on mobile
+- Tauri v2 has first-class mobile support — same codebase as desktop
 - Get mobile-specific feedback early
 - Can dogfood on mobile while building desktop features
 
 ### Architecture
 
-#### Mobile Build Setup
+#### Mobile Build Setup (Tauri v2 Mobile)
+
+Tauri v2 supports iOS and Android natively. The same Svelte frontend and Rust backend are used, with platform-specific configuration.
 
 **iOS**:
-- Use Xcode for builds
+- Tauri generates Xcode project
+- Bundle identifier: `com.bevytasks.app`
 - Target: `aarch64-apple-ios`
-- Bundle identifier: `com.bevy-tasks`
 
 **Android**:
-- Use Android SDK/NDK
-- Build with `cargo-apk` or `cargo-ndk`
+- Tauri generates Gradle project
 - Min SDK: 26 (Android 8.0)
+- NDK handles Rust compilation
 
-#### egui Mobile Adaptation
+#### Mobile Adaptation
 
 **Touch Support**:
-- egui has basic touch support
-- Add larger touch targets (44pt minimum)
+- Tailwind responsive utilities for mobile-friendly layouts
+- Larger touch targets (44pt minimum)
+- Mobile-specific Svelte components where needed
 - Test on real devices
 
 **File System Access**:
-- iOS: App sandbox documents directory + file picker
-- Android: Scoped storage + SAF (Storage Access Framework)
+- iOS: App sandbox documents directory + Tauri file dialog plugin
+- Android: Scoped storage + Tauri file dialog plugin
 
 #### First Run on Mobile
 - Show folder picker on first launch
 - Suggest locations: Documents, iCloud Drive (iOS), Google Drive (Android)
 - User selects folder, path stored in preferences
 
-### Platform-Specific Code
-
-```rust
-#[cfg(target_os = "ios")]
-mod ios {
-    // iOS-specific file picker, etc.
-}
-
-#[cfg(target_os = "android")]
-mod android {
-    // Android-specific file picker, etc.
-}
-```
-
 ### Features
 
-- [ ] iOS build pipeline setup (Xcode project)
-- [ ] Android build pipeline setup (Gradle/NDK)
-- [ ] Basic egui mobile adaptation
-- [ ] Simple test UI (even just buttons for CRUD)
+- [ ] Tauri v2 iOS build pipeline setup
+- [ ] Tauri v2 Android build pipeline setup
+- [ ] Mobile-responsive Svelte/Tailwind layout
 - [ ] File system access on iOS
 - [ ] File system access on Android
 - [ ] Folder picker for mobile
@@ -821,23 +814,23 @@ mod android {
 ### Features
 
 #### Desktop & Mobile
-- [ ] Multiple task lists (folders)
-- [ ] Switch between lists
+- [x] Multiple task lists (folders)
+- [x] Switch between lists
 - [ ] Subtasks support
 - [ ] Due dates with date picker
 - [ ] Rich markdown editor for task notes
 - [ ] Move tasks between lists
 - [ ] Change storage folder location in settings
 - [ ] Search functionality
-- [ ] Theme selection (light/dark mode)
+- [x] Theme selection (light/dark mode)
 
 #### Desktop-Specific
-- [ ] Drag & drop reordering
+- [x] Drag & drop reordering
 - [ ] Keyboard shortcuts
 - [ ] Multiple windows (optional)
 
 #### Mobile-Specific
-- [ ] Swipe gestures (swipe to complete, swipe to delete)
+- [x] Swipe gestures (swipe to complete, swipe to delete)
 - [ ] Pull-to-refresh
 - [ ] Touch-optimized UI elements
 - [ ] Larger touch targets
@@ -945,11 +938,11 @@ mod android {
 ### Optional: Bevy Migration
 
 If you want game-like polish after Phase 7:
-- Migrate GUI from egui to Bevy
+- Migrate GUI from Tauri/Svelte to Bevy
 - Full control over animations and rendering
 - Unique, polished look beyond standard apps
 - Backend (`bevy-tasks-core`) stays identical
-- Only rewrite `bevy-tasks-gui` crate
+- Only rewrite the GUI layer
 
 ### Deliverables
 
@@ -978,6 +971,6 @@ This project is free and open-source software licensed under GPL v3.
 
 ---
 
-**Last Updated**: 2026-03-17
-**Document Version**: 3.1
+**Last Updated**: 2026-03-29
+**Document Version**: 4.0
 **Status**: Ready to Implement - Milestone-Driven Plan

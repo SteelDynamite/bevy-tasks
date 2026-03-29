@@ -140,12 +140,13 @@ async function deleteList(id: string) {
   }
 }
 
-async function createTask(title: string) {
+async function createTask(title: string, description?: string) {
   if (!activeListId) return;
   try {
     const task = await invoke<Task>("create_task", {
       listId: activeListId,
       title,
+      description: description ?? "",
     });
     tasks = [...tasks, task];
     error = null;
@@ -161,7 +162,13 @@ async function toggleTask(taskId: string) {
       listId: activeListId,
       taskId,
     });
-    tasks = tasks.map((t) => (t.id === taskId ? updated : t));
+    // Move to top of list locally, then persist order in background
+    if (updated.status === "backlog") {
+      tasks = [updated, ...tasks.filter((t) => t.id !== taskId)];
+      invoke("reorder_task", { listId: activeListId, taskId, newPosition: 0 }).catch(() => {});
+    } else {
+      tasks = tasks.map((t) => (t.id === taskId ? updated : t));
+    }
   } catch (e) {
     error = String(e);
   }
@@ -172,6 +179,16 @@ async function updateTask(task: Task) {
   try {
     await invoke("update_task", { listId: activeListId, task });
     tasks = tasks.map((t) => (t.id === task.id ? task : t));
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function reorderTask(taskId: string, newPosition: number) {
+  if (!activeListId) return;
+  try {
+    await invoke("reorder_task", { listId: activeListId, taskId, newPosition });
+    await loadTasks();
   } catch (e) {
     error = String(e);
   }
@@ -277,6 +294,7 @@ export const app = {
   createTask,
   toggleTask,
   updateTask,
+  reorderTask,
   deleteTask,
   triggerSync,
   toggleDarkMode,

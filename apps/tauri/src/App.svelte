@@ -3,7 +3,7 @@
   import { app } from "./lib/stores/app.svelte";
   import SetupScreen from "./lib/screens/SetupScreen.svelte";
   import TasksScreen from "./lib/screens/TasksScreen.svelte";
-  import SettingsScreen from "./lib/screens/SettingsScreen.svelte";
+
 
   onMount(() => {
     app.loadConfig();
@@ -25,10 +25,8 @@
 
     {#if app.screen === "setup"}
       <SetupScreen />
-    {:else if app.screen === "tasks"}
+    {:else}
       <TasksScreen />
-    {:else if app.screen === "settings"}
-      <SettingsScreen />
     {/if}
   </div>
 </div>
