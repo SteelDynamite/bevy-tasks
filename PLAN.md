@@ -706,11 +706,15 @@ WorkspaceConfig {
 - [x] Settings popup overlay (WebDAV config, dark mode toggle)
 - [x] Dark mode (GNOME-style neutral theme, cyan-blue accent)
 - [x] Animated completed section show/hide
-- [ ] Due date picker/editor
-- [ ] WebDAV setup flow with credentials
+- [ ] Due date picker/editor (backend supports it, needs date input in new task toast + inline editing)
+- [ ] WebDAV setup flow with credentials (settings panel has fields, triggerSync needs to pull creds from config)
+- [ ] List/workspace rename (needs `rename_list` added to bevy-tasks-core first)
+- [ ] Keyboard shortcuts (Escape to close drawers/menus, tab navigation, Enter behaviors)
 - [ ] Sync status indicators (per workspace)
 - [ ] Push/pull sync mode selection
-- [ ] List/workspace rename
+- [ ] Group-by-due-date toggle per list
+- [ ] Subtask hierarchy (data model exists, needs UI)
+- [ ] Search/filter tasks
 - [ ] Desktop packaging (Windows, Linux, macOS)
 
 ### Deliverables
