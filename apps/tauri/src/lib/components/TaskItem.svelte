@@ -15,6 +15,7 @@
   let animatingIn = $state(false);
 
   let isCompleted = $derived(task.status === "completed");
+  let justChecked = $state(false);
 
   $effect(() => {
     const _ = task.status;
@@ -31,9 +32,12 @@
 
   async function handleToggle(e: MouseEvent) {
     e.stopPropagation();
+    justChecked = true;
+    await new Promise((r) => setTimeout(r, 300));
     transitioning = true;
     animateInIds.add(task.id);
     await new Promise((r) => setTimeout(r, 200));
+    justChecked = false;
     await app.toggleTask(task.id);
   }
 
@@ -53,9 +57,12 @@
     if (Math.abs(swipeX) > 100) {
       swipeX = 0;
       swiping = false;
-      transitioning = true;
-      animateInIds.add(task.id);
-      setTimeout(() => app.toggleTask(task.id), 200);
+      justChecked = true;
+      setTimeout(() => {
+        transitioning = true;
+        animateInIds.add(task.id);
+        setTimeout(() => { justChecked = false; app.toggleTask(task.id); }, 200);
+      }, 300);
       return;
     }
     swipeX = 0;
@@ -105,11 +112,14 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       onclick={handleToggle}
-      class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors {isCompleted
-        ? 'border-primary bg-primary'
-        : 'border-gray-400 dark:border-gray-500'}"
+      class="-m-2 flex shrink-0 items-center justify-center p-2"
     >
-      {#if isCompleted}
+      <div
+        class="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors duration-150 {isCompleted || justChecked
+          ? 'border-primary bg-primary'
+          : 'border-gray-400 dark:border-gray-500'}"
+      >
+      {#if isCompleted || justChecked}
         <svg class="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
           <path
             fill-rule="evenodd"
@@ -117,6 +127,7 @@
           />
         </svg>
       {/if}
+      </div>
     </div>
 
     <!-- Content -->
