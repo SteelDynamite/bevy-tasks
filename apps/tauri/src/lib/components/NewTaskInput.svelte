@@ -15,9 +15,8 @@
 
   async function handleSubmit() {
     if (!title.trim()) return;
-    await app.createTask(title.trim(), description.trim() || undefined);
-    if (dueDate && app.tasks.length > 0) {
-      const created = app.tasks[app.tasks.length - 1];
+    const created = await app.createTask(title.trim(), description.trim() || undefined);
+    if (dueDate && created) {
       await app.updateTask({ ...created, due_date: dueDate, updated_at: new Date().toISOString() });
     }
     title = "";

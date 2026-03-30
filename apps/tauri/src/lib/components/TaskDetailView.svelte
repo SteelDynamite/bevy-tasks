@@ -50,6 +50,7 @@
 
   async function handleDelete() {
     showMenu = false;
+    if (!confirm(`Delete task "${task.title}"?`)) return;
     await app.deleteTask(task.id);
     onback();
   }

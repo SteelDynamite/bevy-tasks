@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { app } from "../stores/app.svelte";
 
   let { onclose }: { onclose?: () => void } = $props();
@@ -11,7 +12,7 @@
   async function testConnection() {
     testStatus = "testing";
     try {
-      await (globalThis as any).__TAURI_INTERNALS__.invoke("test_webdav_connection", {
+      await invoke("test_webdav_connection", {
         url: webdavUrl,
         username: webdavUser,
         password: webdavPass,
@@ -24,18 +25,19 @@
 
   async function saveWebdav() {
     if (!app.config?.current_workspace || !webdavUrl.trim()) return;
-    await (globalThis as any).__TAURI_INTERNALS__.invoke("set_webdav_config", {
+    await invoke("set_webdav_config", {
       workspaceName: app.config.current_workspace,
       webdavUrl: webdavUrl.trim(),
     });
     if (webdavUser && webdavPass) {
       const domain = new URL(webdavUrl).hostname;
-      await (globalThis as any).__TAURI_INTERNALS__.invoke("store_credentials", {
+      await invoke("store_credentials", {
         domain,
         username: webdavUser,
         password: webdavPass,
       });
     }
+    await app.loadConfig();
   }
 
 </script>

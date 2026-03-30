@@ -39,9 +39,6 @@
     if (wsMenuName && !target.closest("[data-ws-menu]")) wsMenuName = null;
   }
 
-  if (typeof window !== "undefined") {
-    window.addEventListener("mousedown", handleWindowClick);
-  }
   let newListName = $state("");
   let showCompleted = $state(false);
   let completedVisible = $state(false);
@@ -52,13 +49,19 @@
   let resizing = $state(false);
   let resizeTimer: ReturnType<typeof setTimeout>;
 
-  if (typeof window !== "undefined") {
-    window.addEventListener("resize", () => {
+  $effect(() => {
+    window.addEventListener("mousedown", handleWindowClick);
+    const handleResize = () => {
       resizing = true;
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => (resizing = false), 150);
-    });
-  }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("mousedown", handleWindowClick);
+      window.removeEventListener("resize", handleResize);
+    };
+  });
 
   async function handleNewList() {
     if (!newListName.trim()) return;
@@ -69,6 +72,8 @@
 
   async function handleDeleteList(id: string) {
     listMenuId = null;
+    const list = app.lists.find(l => l.id === id);
+    if (!confirm(`Delete list "${list?.title ?? id}" and all its tasks?`)) return;
     await app.deleteList(id);
   }
 
@@ -270,7 +275,7 @@
                   {#if wsMenuName === name}
                     <div class="absolute right-0 top-full z-40 mt-1 min-w-[140px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
                       <button
-                        onclick={() => { wsMenuName = null; app.removeWorkspace(name); }}
+                        onclick={() => { wsMenuName = null; if (confirm(`Remove workspace "${name}"? (Files remain on disk)`)) app.removeWorkspace(name); }}
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
                       >
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
