@@ -334,7 +334,6 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <header
           onmousedown={handleHeaderMouseDown}
-          ondblclick={() => { if (isDesktop) appWindow.toggleMaximize(); }}
           class="relative flex items-center border-b border-border-light px-4 py-3 dark:border-border-dark"
         >
           <!-- Drawer toggle (left) -->
@@ -365,14 +364,6 @@
                 >
                   <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M4 10a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" />
-                  </svg>
-                </button>
-                <button
-                  onclick={() => appWindow.toggleMaximize()}
-                  class="rounded p-1.5 opacity-50 hover:bg-black/10 hover:opacity-80 dark:hover:bg-white/10"
-                >
-                  <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="14" height="14" rx="1" />
                   </svg>
                 </button>
               {/if}
