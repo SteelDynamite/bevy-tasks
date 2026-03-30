@@ -1,7 +1,15 @@
 # Rust
 /target
 **/target/
-Cargo.lock
+
+# Node / Tauri frontend
+node_modules/
+dist/
+build/
+
+# Environment / secrets
+.env
+.env.*
 
 # IDE
 .idea/
@@ -9,6 +17,7 @@ Cargo.lock
 *.swp
 *.swo
 *~
+*.iml
 
 # OS
 .DS_Store

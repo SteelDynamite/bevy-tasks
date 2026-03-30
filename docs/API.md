@@ -229,9 +229,9 @@ Tasks are stored as `.md` files with YAML frontmatter:
 ---
 id: 550e8400-e29b-41d4-a716-446655440000
 status: backlog
-due: 2025-11-15T14:00:00Z
-created: 2025-10-26T10:00:00Z
-updated: 2025-10-26T12:30:00Z
+due: 2026-11-15T14:00:00Z
+created: 2026-10-26T10:00:00Z
+updated: 2026-10-26T12:30:00Z
 parent: 550e8400-e29b-41d4-a716-446655440001
 ---
 
@@ -251,8 +251,8 @@ Each list folder contains a `.listdata.json` file:
 ```json
 {
   "id": "list-uuid-1",
-  "created_at": "2025-10-26T10:00:00Z",
-  "updated_at": "2025-10-27T14:30:00Z",
+  "created_at": "2026-10-26T10:00:00Z",
+  "updated_at": "2026-10-27T14:30:00Z",
   "group_by_due_date": false,
   "task_order": [
     "task-uuid-1",
@@ -273,6 +273,93 @@ The root folder contains a `.metadata.json` file:
   "last_opened_list": "list-uuid-1"
 }
 ```
+
+## WebDAV & Sync
+
+The sync module provides bi-directional WebDAV synchronization with three-way diff, offline queuing, and platform keychain credential storage.
+
+### Sync Functions
+
+Sync functions live in the `bevy_tasks_core::sync` module as standalone functions (not on `TaskRepository`).
+
+#### Sync a Workspace
+
+```rust
+use bevy_tasks_core::sync::{sync_workspace, SyncMode};
+use std::path::Path;
+
+// Full bi-directional sync
+let result = sync_workspace(
+    Path::new("/home/user/tasks"),
+    "https://nextcloud.example.com/remote.php/dav/files/user/Tasks",
+    "username",
+    "password",
+    SyncMode::Full,
+).await?;
+
+// Push-only or pull-only
+sync_workspace(path, url, user, pass, SyncMode::PushOnly).await?;
+sync_workspace(path, url, user, pass, SyncMode::PullOnly).await?;
+```
+
+#### Check Sync Status
+
+```rust
+use bevy_tasks_core::sync::get_sync_status;
+
+let status = get_sync_status(Path::new("/home/user/tasks"))?;
+// Returns SyncStatusInfo with last sync time, pending changes, etc.
+```
+
+### Credential Storage
+
+Credentials are stored in the platform keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service).
+
+```rust
+use bevy_tasks_core::webdav::{store_credentials, load_credentials, delete_credentials};
+
+// Store credentials
+store_credentials("nextcloud.example.com", "username", "password")?;
+
+// Load credentials
+let (username, password) = load_credentials("nextcloud.example.com")?;
+
+// Delete credentials
+delete_credentials("nextcloud.example.com")?;
+```
+
+### WebDAV Client
+
+```rust
+use bevy_tasks_core::webdav::WebDavClient;
+
+let client = WebDavClient::new(
+    "https://nextcloud.example.com/remote.php/dav/files/user/Tasks",
+    "username",
+    "password",
+);
+
+// Test connection
+client.test_connection().await?;
+
+// List remote files
+let files = client.list_files("/").await?;
+
+// Upload/download
+client.put_file("My Tasks/task.md", content).await?;
+let data = client.get_file("My Tasks/task.md").await?;
+
+// Directory operations
+client.ensure_dir("My Tasks").await?;
+client.delete_file("old-task.md").await?;
+```
+
+### Sync Strategy
+
+- **Three-way diff**: Compares local state, remote state, and last-known baseline to determine actions (upload, download, delete local/remote)
+- **Conflict resolution**: Last-write-wins using file timestamps
+- **Offline queue**: Pending operations are queued and replayed when connectivity returns
+- **Sync state**: Stored in `.syncstate.json` within the workspace directory
 
 ## Error Handling
 

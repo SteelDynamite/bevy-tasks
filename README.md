@@ -18,29 +18,41 @@ bevy-tasks/
 ├── README.md                     # This file
 ├── crates/
 │   ├── bevy-tasks-core/          # Core library (backend)
-│   ├── bevy-tasks-cli/           # CLI frontend
-│   └── bevy-tasks-gui/           # GUI frontend (Phase 3+)
+│   └── bevy-tasks-cli/           # CLI frontend
+├── apps/
+│   └── tauri/                    # Tauri v2 GUI (Svelte 5 + Tailwind CSS 4)
 └── docs/
 ```
 
-## Phase 1 Status: Core Library & CLI MVP ✅
+## Project Status
 
-Phase 1 implementation is complete with the following features:
+- **Phase 1** (Core + CLI): Complete
+- **Phase 2** (WebDAV Sync): Backend and CLI complete, GUI partially wired
+- **Phase 3** (GUI MVP): In progress — core task CRUD working, UI polished
 
 ### Core Library (`bevy-tasks-core`)
-- ✅ Data models (Task, TaskList, AppConfig, WorkspaceConfig)
-- ✅ Markdown file I/O with YAML frontmatter
-- ✅ Local storage implementation
-- ✅ Repository pattern with clean API
-- ✅ Multiple workspace support
-- ✅ Task ordering and grouping
+- Data models (Task, TaskList, AppConfig, WorkspaceConfig)
+- Markdown file I/O with YAML frontmatter
+- Local storage with repository pattern
+- Multiple workspace support
+- Task ordering and grouping
+- WebDAV sync with three-way diff and offline queue
+- Platform keychain credential storage
 
 ### CLI (`bevy-tasks-cli`)
-- ✅ Workspace management (init, add, list, switch, remove, retarget, migrate)
-- ✅ Task list management (create, show, delete)
-- ✅ Task operations (add, complete, delete, edit)
-- ✅ Group-by-due-date toggle
-- ✅ Support for `--workspace` flag on all commands
+- Workspace management (init, add, list, switch, remove, retarget, migrate)
+- Task list management (create, show, delete)
+- Task operations (add, complete, delete, edit)
+- Group-by-due-date toggle
+- WebDAV sync (setup, push, pull, status)
+
+### GUI (`apps/tauri/`)
+- Tauri v2 + Svelte 5 + Tailwind CSS 4
+- Task CRUD with animated transitions
+- Drag-and-drop reordering
+- Sliding lists drawer, settings popup
+- Workspace switcher with add/remove
+- Dark mode
 
 ## Development Setup
 
@@ -48,12 +60,13 @@ Phase 1 implementation is complete with the following features:
 
 - Rust 1.70+ (install from [rustup.rs](https://rustup.rs/))
 - Git
+- Node.js 18+ (for Tauri GUI)
 
 ### Build
 
 ```bash
 # Clone and build
-git clone <repository-url>
+git clone https://github.com/SteelDynamite/bevy-tasks.git
 cd bevy-tasks
 cargo build
 
@@ -62,6 +75,10 @@ cargo test -p bevy-tasks-core
 
 # Run CLI
 cargo run -p bevy-tasks-cli -- --help
+
+# Run Tauri GUI
+cd apps/tauri && npm install
+npm run tauri dev
 ```
 
 ## Quick Start
@@ -85,7 +102,7 @@ cargo run -p bevy-tasks-cli -- init ~/Documents/Tasks --name personal
 cargo run -p bevy-tasks-cli -- add "Buy groceries"
 
 # Add a task with due date
-cargo run -p bevy-tasks-cli -- add "Review PR #123" --list "Work" --due "2025-11-15"
+cargo run -p bevy-tasks-cli -- add "Review PR #123" --list "Work" --due "2026-11-15"
 
 # List all tasks
 cargo run -p bevy-tasks-cli -- list show
@@ -137,9 +154,9 @@ Tasks are stored as markdown files with YAML frontmatter (Obsidian-compatible):
 ---
 id: 550e8400-e29b-41d4-a716-446655440000
 status: backlog
-due: 2025-11-15T14:00:00Z
-created: 2025-10-26T10:00:00Z
-updated: 2025-10-26T12:30:00Z
+due: 2026-11-15T14:00:00Z
+created: 2026-10-26T10:00:00Z
+updated: 2026-10-26T12:30:00Z
 ---
 
 Task description and notes go here in **markdown** format.
@@ -181,11 +198,9 @@ cargo test -- --nocapture
 
 ## What's Next?
 
-- **Phase 2**: WebDAV sync for cross-device synchronization
-- **Phase 3**: GUI with egui for desktop platforms
-- **Phase 4**: Mobile support (iOS & Android)
-- **Phase 5**: Advanced features and polish
-- **Phase 6**: Platform-specific integrations
+- **Phase 4**: Mobile support (iOS & Android via Tauri v2)
+- **Phase 5**: GUI advanced features (subtasks, search, date picker)
+- **Phase 6**: Mobile polish and platform-specific integrations
 - **Phase 7**: Google Tasks importer and unique features
 
 See [PLAN.md](PLAN.md) for detailed roadmap.

@@ -61,9 +61,9 @@ Tasks are stored as individual `.md` files with YAML frontmatter:
 ---
 id: 550e8400-e29b-41d4-a716-446655440000
 status: backlog
-due: 2025-11-15T14:00:00Z
-created: 2025-10-26T10:00:00Z
-updated: 2025-10-26T12:30:00Z
+due: 2026-11-15T14:00:00Z
+created: 2026-10-26T10:00:00Z
+updated: 2026-10-26T12:30:00Z
 parent: 550e8400-e29b-41d4-a716-446655440001
 ---
 
@@ -145,8 +145,8 @@ WorkspaceConfig {
 ```json
 {
   "id": "list-uuid-1",
-  "created_at": "2025-10-26T10:00:00Z",
-  "updated_at": "2025-10-27T14:30:00Z",
+  "created_at": "2026-10-26T10:00:00Z",
+  "updated_at": "2026-10-27T14:30:00Z",
   "group_by_due_date": false,
   "task_order": [
     "task-uuid-1",
@@ -340,9 +340,9 @@ $ bevy-tasks list create "Personal Projects"
 $ bevy-tasks add "Buy groceries"
 ✓ Created task "Buy groceries" (550e8400-e29b-41d4-a716-446655440000)
 
-$ bevy-tasks add "Review PR #123" --list "Work" --due "2025-11-15"
+$ bevy-tasks add "Review PR #123" --list "Work" --due "2026-11-15"
 ✓ Created task "Review PR #123" (7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c)
-  Due: 2025-11-15
+  Due: 2026-11-15
 
 # Or specify workspace explicitly
 $ bevy-tasks add "Team meeting" --workspace shared
@@ -356,7 +356,7 @@ My Tasks (3 tasks)
   [✓] Pay bills
 
 Work (2 tasks)
-  [ ] Review PR #123 (due: 2025-11-15)
+  [ ] Review PR #123 (due: 2026-11-15)
   [ ] Team meeting prep
 
 # List tasks from specific workspace
@@ -368,7 +368,7 @@ Shared Tasks (2 tasks)
 # List tasks in specific list
 $ bevy-tasks list show --list "Work"
 Work (2 tasks)
-  [ ] Review PR #123 (due: 2025-11-15)
+  [ ] Review PR #123 (due: 2026-11-15)
   [ ] Team meeting prep
 
 # Complete a task
@@ -466,12 +466,21 @@ AppConfig {
     current_workspace: Option<String>,
 }
 
-// Add sync methods to TaskRepository
-impl TaskRepository {
-    pub fn sync_push(&mut self) -> Result<SyncResult>;
-    pub fn sync_pull(&mut self) -> Result<SyncResult>;
-    pub fn sync_status(&self) -> Result<SyncStatus>;
-}
+// Sync functions in bevy_tasks_core::sync module (standalone, not on TaskRepository)
+pub async fn sync_workspace(
+    workspace_path: &Path,
+    webdav_url: &str,
+    username: &str,
+    password: &str,
+    mode: SyncMode,       // Full, PushOnly, or PullOnly
+) -> Result<SyncResult>;
+
+pub fn get_sync_status(workspace_path: &Path) -> Result<SyncStatusInfo>;
+
+// Credential functions in bevy_tasks_core::webdav module
+pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result<()>;
+pub fn load_credentials(domain: &str) -> Result<(String, String)>;
+pub fn delete_credentials(domain: &str) -> Result<()>;
 ```
 
 #### Sync Strategy
@@ -562,7 +571,7 @@ $ bevy-tasks sync --status
 Workspace: personal
 WebDAV Server: https://nextcloud.example.com/remote.php/dav/files/username/Tasks
 Status: Connected
-Last sync: 2025-10-27 14:32:15
+Last sync: 2026-10-27 14:32:15
 Local changes: 2 files modified
 Remote changes: 0 files modified
 
@@ -571,12 +580,12 @@ $ bevy-tasks sync --status --all
 Workspace: personal
   WebDAV: https://nextcloud.example.com/.../Tasks
   Status: Connected
-  Last sync: 2025-10-27 14:32:15
+  Last sync: 2026-10-27 14:32:15
 
 Workspace: shared
   WebDAV: https://nextcloud.example.com/.../SharedTasks
   Status: Connected
-  Last sync: 2025-10-27 14:28:42
+  Last sync: 2026-10-27 14:28:42
 ```
 
 ### Deliverables
@@ -973,6 +982,6 @@ This project is free and open-source software licensed under GPL v3.
 
 ---
 
-**Last Updated**: 2026-03-29
+**Last Updated**: 2026-03-30
 **Document Version**: 4.0
 **Status**: Ready to Implement - Milestone-Driven Plan
