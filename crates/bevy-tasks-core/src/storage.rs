@@ -148,8 +148,26 @@ impl FileSystemStorage {
         self.root_path.join(name)
     }
 
+    fn sanitize_filename(name: &str) -> String {
+        name.chars()
+            .map(|c| match c {
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+                '\0'..='\x1f' => '_',
+                _ => c,
+            })
+            .collect::<String>()
+            .trim_matches(|c: char| c == '.' || c == ' ')
+            .to_string()
+    }
+
     fn task_file_path(&self, list_dir: &Path, task: &Task) -> PathBuf {
-        list_dir.join(format!("{}.md", task.title))
+        let safe_title = Self::sanitize_filename(&task.title);
+        let filename = if safe_title.is_empty() {
+            task.id.to_string()
+        } else {
+            safe_title
+        };
+        list_dir.join(format!("{}.md", filename))
     }
 
     fn parse_markdown_with_frontmatter(&self, content: &str) -> Result<(TaskFrontmatter, String)> {
