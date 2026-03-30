@@ -35,7 +35,7 @@ pub fn execute(path: String, name: String) -> Result<()> {
     config.save_to_file(&config_path)
         .context("Failed to save config")?;
 
-    output::success(&format!("Initialized workspace \"{}\" at {:?}", name, path_buf));
+    output::success(&format!("Initialized workspace \"{}\" at {}", name, path_buf.display()));
     output::success("Created default list \"My Tasks\"");
     output::success(&format!("Set \"{}\" as current workspace", name));
 

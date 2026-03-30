@@ -7,12 +7,13 @@
 - Rust 1.70 or higher
 - Git
 - A text editor or IDE with Rust support (VS Code with rust-analyzer recommended)
+- Node.js 18+ (for Tauri GUI development)
 
 ### Initial Setup
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/SteelDynamite/bevy-tasks.git
 cd bevy-tasks
 
 # Build the project
@@ -23,6 +24,10 @@ cargo test
 
 # Run the CLI
 cargo run -p bevy-tasks-cli -- --help
+
+# Run the Tauri GUI
+cd apps/tauri && npm install
+npm run tauri dev
 ```
 
 ## Project Structure
@@ -38,7 +43,9 @@ bevy-tasks/
 │   │   │   ├── config.rs               # Configuration (AppConfig, WorkspaceConfig)
 │   │   │   ├── storage.rs              # Storage trait and filesystem implementation
 │   │   │   ├── repository.rs           # Repository pattern (TaskRepository)
-│   │   │   └── error.rs                # Error types
+│   │   │   ├── error.rs                # Error types
+│   │   │   ├── sync.rs                 # Three-way sync engine with offline queue
+│   │   │   └── webdav.rs               # WebDAV client and credential storage
 │   │   └── Cargo.toml
 │   ├── bevy-tasks-cli/                 # CLI application
 │   │   ├── src/
@@ -50,12 +57,30 @@ bevy-tasks/
 │   │   │       ├── workspace.rs        # Workspace management
 │   │   │       ├── list.rs             # List management
 │   │   │       ├── task.rs             # Task operations
-│   │   │       └── group.rs            # Grouping commands
+│   │   │       ├── group.rs            # Grouping commands
+│   │   │       └── sync.rs             # WebDAV sync commands
 │   │   └── Cargo.toml
-│   └── bevy-tasks-gui/                 # GUI application (Phase 3+)
-│       ├── src/
-│       │   └── main.rs                 # Placeholder
-│       └── Cargo.toml
+├── apps/
+│   └── tauri/                          # Tauri v2 GUI application
+│       ├── package.json
+│       ├── vite.config.ts
+│       ├── svelte.config.js
+│       ├── tsconfig.json
+│       ├── index.html
+│       ├── src/                        # Svelte 5 frontend
+│       │   ├── main.ts
+│       │   ├── app.css                 # Tailwind CSS 4 + theme
+│       │   ├── App.svelte
+│       │   └── lib/
+│       │       ├── screens/            # Full-page views
+│       │       ├── components/         # Reusable UI components
+│       │       └── stores/             # Svelte state (app.svelte.ts)
+│       └── src-tauri/                  # Rust backend (Tauri commands)
+│           ├── Cargo.toml
+│           ├── tauri.conf.json
+│           └── src/
+│               ├── main.rs
+│               └── lib.rs              # Tauri command handlers
 └── docs/
     ├── API.md                          # API documentation
     └── DEVELOPMENT.md                  # This file

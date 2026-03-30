@@ -21,8 +21,8 @@ pub fn setup(workspace_name: Option<String>) -> Result<()> {
     };
 
     // Prompt for WebDAV URL
-    println!("WebDAV sync setup for workspace \"{}\"", name.green());
-    println!();
+    output::header(&format!("WebDAV sync setup for workspace \"{}\"", name.green()));
+    output::blank();
 
     let url = prompt("WebDAV URL: ")?;
     if url.is_empty() {
@@ -35,8 +35,8 @@ pub fn setup(workspace_name: Option<String>) -> Result<()> {
         .context("Failed to read password")?;
 
     // Test connection
-    println!();
-    println!("Testing connection...");
+    output::blank();
+    output::info("Testing connection...");
 
     let rt = tokio::runtime::Runtime::new().context("Failed to create async runtime")?;
     let client = WebDavClient::new(&url, &username, &password);
@@ -102,7 +102,7 @@ pub fn execute(mode: SyncMode, workspace_name: Option<String>) -> Result<()> {
         SyncMode::Push => "Pushing",
         SyncMode::Pull => "Pulling",
     };
-    println!("{} workspace \"{}\"...", mode_str, name.green());
+    output::info(&format!("{} workspace \"{}\"...", mode_str, name.green()));
 
     let rt = tokio::runtime::Runtime::new().context("Failed to create async runtime")?;
     let result = rt.block_on(sync_workspace(
@@ -153,7 +153,7 @@ pub fn status(workspace_name: Option<String>, all: bool) -> Result<()> {
             if ws.webdav_url.is_some() {
                 found_any = true;
                 print_workspace_status(&name, &ws.path, ws.webdav_url.as_deref())?;
-                println!();
+                output::blank();
             }
         }
         if !found_any {
@@ -178,27 +178,27 @@ pub fn status(workspace_name: Option<String>, all: bool) -> Result<()> {
 }
 
 fn print_workspace_status(name: &str, path: &std::path::Path, webdav_url: Option<&str>) -> Result<()> {
-    println!("Workspace: {}", name.green());
+    output::header(&format!("Workspace: {}", name.green()));
 
     if let Some(url) = webdav_url {
-        println!("  WebDAV URL: {}", url);
+        output::detail("WebDAV URL", url);
     } else {
-        println!("  WebDAV: {}", "not configured".dimmed());
+        output::detail("WebDAV", &"not configured".dimmed().to_string());
         return Ok(());
     }
 
     let info = get_sync_status(path)?;
 
     if let Some(last) = info.last_sync {
-        println!("  Last sync: {}", last.format("%Y-%m-%d %H:%M:%S UTC"));
+        output::detail("Last sync", &last.format("%Y-%m-%d %H:%M:%S UTC").to_string());
     } else {
-        println!("  Last sync: {}", "never".dimmed());
+        output::detail("Last sync", &"never".dimmed().to_string());
     }
 
-    println!("  Tracked files: {}", info.tracked_files);
-    println!("  Pending changes: {}", info.pending_changes);
+    output::detail("Tracked files", &info.tracked_files.to_string());
+    output::detail("Pending changes", &info.pending_changes.to_string());
     if info.queued_operations > 0 {
-        println!("  Queued operations: {}", format!("{}", info.queued_operations).yellow());
+        output::detail("Queued operations", &format!("{}", info.queued_operations).yellow().to_string());
     }
 
     Ok(())

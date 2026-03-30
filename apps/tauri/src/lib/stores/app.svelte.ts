@@ -140,8 +140,8 @@ async function deleteList(id: string) {
   }
 }
 
-async function createTask(title: string, description?: string) {
-  if (!activeListId) return;
+async function createTask(title: string, description?: string): Promise<Task | null> {
+  if (!activeListId) return null;
   try {
     const task = await invoke<Task>("create_task", {
       listId: activeListId,
@@ -150,8 +150,10 @@ async function createTask(title: string, description?: string) {
     });
     tasks = [...tasks, task];
     error = null;
+    return task;
   } catch (e) {
     error = String(e);
+    return null;
   }
 }
 
@@ -214,11 +216,13 @@ async function triggerSync() {
   syncing = true;
   error = null;
   try {
+    const domain = new URL(ws.webdav_url).hostname;
+    const [username, password] = await invoke<[string, string]>("load_credentials", { domain });
     const result = await invoke<SyncResult>("sync_workspace", {
       workspacePath: ws.path,
       webdavUrl: ws.webdav_url,
-      username: "",
-      password: "",
+      username,
+      password,
     });
     if (result.errors.length > 0) {
       error = result.errors.join("; ");

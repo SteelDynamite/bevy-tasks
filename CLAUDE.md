@@ -55,7 +55,7 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - **Kebab menus**: Tasks, lists, and workspaces all use kebab → submenu pattern for delete.
 - **New task**: FAB button opens bottom toast sheet (outside sliding container for fixed positioning).
 
-### Current state (2026-03-29)
+### Current state (2026-03-30)
 
 - **Phase 1** (Core + CLI): Complete
 - **Phase 2** (WebDAV sync): Backend done, CLI done, GUI partially wired (empty credentials issue)

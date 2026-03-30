@@ -311,6 +311,11 @@ fn store_credentials(
 }
 
 #[tauri::command]
+fn load_credentials(domain: String) -> Result<(String, String), String> {
+    webdav::load_credentials(&domain).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn test_webdav_connection(
     url: String,
     username: String,
@@ -373,6 +378,7 @@ pub fn run() {
             reorder_task,
             set_webdav_config,
             store_credentials,
+            load_credentials,
             test_webdav_connection,
             sync_workspace,
         ])
