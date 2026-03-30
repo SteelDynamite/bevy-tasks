@@ -706,6 +706,8 @@ WorkspaceConfig {
 - [x] Settings popup overlay (WebDAV config, dark mode toggle)
 - [x] Dark mode (GNOME-style neutral theme, cyan-blue accent)
 - [x] Animated completed section show/hide
+- [ ] Move task between lists (needs `move_task(from_list, to_list, task_id)` added to bevy-tasks-core + Tauri command, then wire into task detail kebab menu)
+- [ ] Optional time on due dates (backend `due_date` is `DateTime<Utc>` — needs a separate `due_time` field or a nullable time component so date-only tasks don't default to midnight; currently the GUI uses `hours == 0 && minutes == 0` as a heuristic for "no time set" which breaks for actual midnight times)
 - [ ] Due date picker/editor (backend supports it, needs date input in new task toast + inline editing)
 - [ ] WebDAV setup flow with credentials (settings panel has fields, triggerSync needs to pull creds from config)
 - [ ] List/workspace rename (needs `rename_list` added to bevy-tasks-core first)
