@@ -38,7 +38,7 @@ pub fn add(name: String, path: String) -> Result<()> {
     // Save config
     save_config(&config)?;
 
-    output::success(&format!("Added workspace \"{}\" at {:?}", name, path_buf));
+    output::success(&format!("Added workspace \"{}\" at {}", name, path_buf.display()));
     output::success("Created default list \"My Tasks\"");
 
     Ok(())
@@ -48,7 +48,7 @@ pub fn list() -> Result<()> {
     let config = load_config()?;
 
     if config.workspaces.is_empty() {
-        println!("No workspaces configured. Use 'bevy-tasks init' to create one.");
+        output::info("No workspaces configured. Use 'bevy-tasks init' to create one.");
         return Ok(());
     }
 
@@ -63,7 +63,7 @@ pub fn list() -> Result<()> {
         } else {
             "".normal()
         };
-        println!("  {}: {:?}{}", name, workspace_config.path, marker);
+        output::item(&format!("{}: {}{}", name, workspace_config.path.display(), marker));
     }
 
     Ok(())
@@ -103,7 +103,7 @@ pub fn remove(name: String) -> Result<()> {
     io::stdin().read_line(&mut input)?;
 
     if input.trim().to_lowercase() != "y" {
-        println!("Cancelled");
+        output::info("Cancelled");
         return Ok(());
     }
 
@@ -134,7 +134,7 @@ pub fn retarget(name: String, path: String) -> Result<()> {
     config.add_workspace(name.clone(), WorkspaceConfig::new(path_buf.clone()));
     save_config(&config)?;
 
-    output::success(&format!("Workspace \"{}\" now points to {:?}", name, path_buf));
+    output::success(&format!("Workspace \"{}\" now points to {}", name, path_buf.display()));
 
     Ok(())
 }
@@ -155,7 +155,7 @@ pub fn migrate(name: String, new_path: String) -> Result<()> {
         .path.clone();
 
     // Confirm
-    output::warning(&format!("This will move all files from {:?} to {:?}", old_path, new_path_buf));
+    output::warning(&format!("This will move all files from {} to {}", old_path.display(), new_path_buf.display()));
     print!("Continue? (y/n): ");
     use std::io::{self, Write};
     io::stdout().flush()?;
@@ -164,7 +164,7 @@ pub fn migrate(name: String, new_path: String) -> Result<()> {
     io::stdin().read_line(&mut input)?;
 
     if input.trim().to_lowercase() != "y" {
-        println!("Cancelled");
+        output::info("Cancelled");
         return Ok(());
     }
 
@@ -172,7 +172,7 @@ pub fn migrate(name: String, new_path: String) -> Result<()> {
     std::fs::create_dir_all(&new_path_buf)?;
 
     // Move files
-    println!("Moving files...");
+    output::info("Moving files...");
     let entries = std::fs::read_dir(&old_path)?;
     let mut count = 0;
 
@@ -185,10 +185,10 @@ pub fn migrate(name: String, new_path: String) -> Result<()> {
             let mut options = fs_extra::dir::CopyOptions::new();
             options.copy_inside = true;
             fs_extra::dir::move_dir(entry.path(), &new_path_buf, &options)?;
-            println!("  Moved {:?}/", file_name);
+            output::item(&format!("Moved {}/", file_name.to_string_lossy()));
         } else {
             std::fs::rename(entry.path(), dest)?;
-            println!("  Moved {:?}", file_name);
+            output::item(&format!("Moved {}", file_name.to_string_lossy()));
         }
         count += 1;
     }
@@ -202,8 +202,8 @@ pub fn migrate(name: String, new_path: String) -> Result<()> {
     config.add_workspace(name.clone(), WorkspaceConfig::new(new_path_buf.clone()));
     save_config(&config)?;
 
-    output::success(&format!("Migrated {} items to {:?}", count, new_path_buf));
-    output::success(&format!("Workspace \"{}\" now points to {:?}", name, new_path_buf));
+    output::success(&format!("Migrated {} items to {}", count, new_path_buf.display()));
+    output::success(&format!("Workspace \"{}\" now points to {}", name, new_path_buf.display()));
 
     Ok(())
 }

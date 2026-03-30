@@ -1,7 +1,20 @@
 use anyhow::{Context, Result};
 use colored::*;
+use bevy_tasks_core::{Task, TaskStatus};
 use crate::output;
 use crate::commands::get_repository;
+
+fn print_tasks(tasks: &[Task]) {
+    if tasks.is_empty() {
+        output::item("No tasks");
+        return;
+    }
+    for task in tasks {
+        let checkbox = if task.status == TaskStatus::Completed { "[✓]".green() } else { "[ ]".normal() };
+        let due_str = task.due_date.map(|d| format!(" (due: {})", d.format("%Y-%m-%d")).yellow().to_string()).unwrap_or_default();
+        output::item(&format!("{} {}{} {}", checkbox, task.title, due_str, task.id.to_string().dimmed()));
+    }
+}
 
 pub fn create(name: String, workspace: Option<String>) -> Result<()> {
     let (mut repo, _workspace_name) = get_repository(workspace)?;
@@ -21,7 +34,7 @@ pub fn show(list_name: Option<String>, workspace: Option<String>) -> Result<()> 
         .context("Failed to get lists")?;
 
     if lists.is_empty() {
-        println!("No lists found. Create one with 'bevy-tasks list create <name>'");
+        output::info("No lists found. Create one with 'bevy-tasks list create <name>'");
         return Ok(());
     }
 
@@ -31,54 +44,14 @@ pub fn show(list_name: Option<String>, workspace: Option<String>) -> Result<()> 
             .find(|l| l.title == name)
             .ok_or_else(|| anyhow::anyhow!("List '{}' not found", name))?;
 
-        println!("{} {} {}", list.title.bold(), format!("({} tasks)", list.tasks.len()).dimmed(), "");
-
-        if list.tasks.is_empty() {
-            println!("  No tasks");
-        } else {
-            for task in &list.tasks {
-                let checkbox = if task.status == bevy_tasks_core::TaskStatus::Completed {
-                    "[✓]".green()
-                } else {
-                    "[ ]".normal()
-                };
-
-                let due_str = if let Some(due) = task.due_date {
-                    format!(" (due: {})", due.format("%Y-%m-%d")).yellow().to_string()
-                } else {
-                    String::new()
-                };
-
-                let id_str = task.id.to_string();
-                println!("  {} {}{} {}", checkbox, task.title, due_str, id_str.dimmed());
-            }
-        }
+        output::header(&format!("{} ({})", list.title, format!("{} tasks", list.tasks.len()).dimmed()));
+        print_tasks(&list.tasks);
     } else {
         // Show all lists
         for list in &lists {
-            println!("{} {}", list.title.bold(), format!("({} tasks)", list.tasks.len()).dimmed());
-
-            if list.tasks.is_empty() {
-                println!("  No tasks");
-            } else {
-                for task in &list.tasks {
-                    let checkbox = if task.status == bevy_tasks_core::TaskStatus::Completed {
-                        "[✓]".green()
-                    } else {
-                        "[ ]".normal()
-                    };
-
-                    let due_str = if let Some(due) = task.due_date {
-                        format!(" (due: {})", due.format("%Y-%m-%d")).yellow().to_string()
-                    } else {
-                        String::new()
-                    };
-
-                    let id_str = task.id.to_string();
-                    println!("  {} {}{} {}", checkbox, task.title, due_str, id_str.dimmed());
-                }
-            }
-            println!();
+            output::header(&format!("{} ({})", list.title, format!("{} tasks", list.tasks.len()).dimmed()));
+            print_tasks(&list.tasks);
+            output::blank();
         }
     }
 
@@ -105,7 +78,7 @@ pub fn delete(name: String, workspace: Option<String>) -> Result<()> {
     io::stdin().read_line(&mut input)?;
 
     if input.trim().to_lowercase() != "y" {
-        println!("Cancelled");
+        output::info("Cancelled");
         return Ok(());
     }
 

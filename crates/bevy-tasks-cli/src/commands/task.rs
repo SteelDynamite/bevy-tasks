@@ -100,7 +100,7 @@ pub fn delete(task_id_str: String, workspace: Option<String>) -> Result<()> {
             let mut input = String::new();
             io::stdin().read_line(&mut input)?;
             if input.trim().to_lowercase() != "y" {
-                println!("Cancelled");
+                output::info("Cancelled");
                 return Ok(());
             }
 
