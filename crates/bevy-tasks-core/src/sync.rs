@@ -173,7 +173,7 @@ pub fn compute_sync_actions(
 
             // Remote present, local gone, base known: local was deleted
             (None, Some(_), Some(b)) => {
-                let remote_changed = remote.map_or(false, |r| r.size != b.size || r.last_modified.as_deref() != b.modified_at.as_deref());
+                let remote_changed = remote.is_some_and(|r| r.size != b.size || r.last_modified.as_deref() != b.modified_at.as_deref());
                 if remote_changed {
                     // deleted locally + modified remotely -> download (remote wins)
                     actions.push(SyncAction::Download { path: path.to_string() });
@@ -374,9 +374,9 @@ fn scan_dir_recursive(root: &Path, dir: &Path, files: &mut Vec<LocalFileInfo>) -
             let data = std::fs::read(&path)?;
             let metadata = std::fs::metadata(&path)?;
             let modified = metadata.modified().ok()
-                .and_then(|t| {
+                .map(|t| {
                     let dt: DateTime<Utc> = t.into();
-                    Some(dt.to_rfc3339())
+                    dt.to_rfc3339()
                 });
 
             files.push(LocalFileInfo {
@@ -540,7 +540,7 @@ pub async fn sync_workspace(
 
     // Save queue with remaining failed actions
     let new_queue = OfflineQueue {
-        operations: failed_actions.iter().map(|a| action_to_queued_op(a)).collect(),
+        operations: failed_actions.iter().map(action_to_queued_op).collect(),
     };
     new_queue.save(workspace_path)?;
 

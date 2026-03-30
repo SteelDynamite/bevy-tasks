@@ -37,7 +37,7 @@ impl WebDavClient {
             // Percent-encode path segments while preserving '/'
             let encoded: String = path
                 .split('/')
-                .map(|seg| percent_encode(seg))
+                .map(percent_encode)
                 .collect::<Vec<_>>()
                 .join("/");
             format!("{}/{}", self._base_url, encoded)
@@ -405,9 +405,8 @@ pub fn load_credentials(domain: &str) -> Result<(String, String)> {
     let pass_entry = keyring::Entry::new(&service, "password")
         .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
 
-    match (user_entry.get_password(), pass_entry.get_password()) {
-        (Ok(user), Ok(pass)) => return Ok((user, pass)),
-        _ => {}
+    if let (Ok(user), Ok(pass)) = (user_entry.get_password(), pass_entry.get_password()) {
+        return Ok((user, pass));
     }
 
     // Fallback to env vars for headless/CI environments
