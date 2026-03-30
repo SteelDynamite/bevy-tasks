@@ -1,8 +1,28 @@
 <script lang="ts">
   import { app } from "../stores/app.svelte";
   import TaskItem from "../components/TaskItem.svelte";
+  import TaskDetailView from "../components/TaskDetailView.svelte";
   import NewTaskInput, { newTaskState } from "../components/NewTaskInput.svelte";
   import SettingsScreen from "./SettingsScreen.svelte";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { platform } from "@tauri-apps/plugin-os";
+  import type { Task } from "../types";
+
+  const appWindow = getCurrentWindow();
+  const currentPlatform = platform();
+  const isDesktop = currentPlatform === "linux" || currentPlatform === "windows";
+  const isWindows = currentPlatform === "windows";
+
+  let selectedTaskId = $state<string | null>(null);
+  let selectedTask = $derived(selectedTaskId ? app.tasks.find(t => t.id === selectedTaskId) ?? null : null);
+
+  function openTask(task: Task) {
+    selectedTaskId = task.id;
+  }
+
+  function closeDetail() {
+    selectedTaskId = null;
+  }
 
   let showDrawer = $state(false);
   let showSettings = $state(false);
@@ -23,8 +43,8 @@
     window.addEventListener("mousedown", handleWindowClick);
   }
   let newListName = $state("");
-  let showCompleted = $state(true);
-  let completedVisible = $state(true);
+  let showCompleted = $state(false);
+  let completedVisible = $state(false);
   let listMenuId = $state<string | null>(null);
   let wsMenuName = $state<string | null>(null);
   let dragId = $state<string | null>(null);
@@ -113,19 +133,25 @@
     showSettings = false;
   }
 
+  function handleHeaderMouseDown(e: MouseEvent) {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    if (isDesktop) appWindow.startDragging();
+  }
+
   let workspaceNames = $derived(app.config ? Object.keys(app.config.workspaces) : []);
-  let translateX = $derived(showDrawer ? '0' : '-80vw');
+  let translateX = $derived(showDrawer ? '0' : '-80cqi');
 </script>
 
 <!-- Viewport clip -->
-<div class="h-screen w-screen overflow-hidden">
+<div class="h-full w-full overflow-hidden">
 <!-- Sliding container: left drawer + main content -->
 <div
   class="flex h-full ease-out {resizing ? '' : 'transition-transform duration-250'}"
-  style="width: calc(100vw + 80vw); transform: translateX({translateX})"
+  style="width: calc(100cqi + 80cqi); transform: translateX({translateX})"
 >
   <!-- Drawer panel -->
-  <div class="flex h-full w-[80vw] shrink-0 flex-col bg-surface-light dark:bg-surface-dark">
+  <div class="flex h-full shrink-0 flex-col bg-surface-light dark:bg-surface-dark" style="width: 80cqi">
     <!-- List items + new list button -->
     <div class="flex-1 overflow-y-auto py-2">
       {#each app.lists as list (list.id)}
@@ -287,7 +313,7 @@
   </div>
 
   <!-- Main content panel -->
-  <div class="relative flex h-full w-screen shrink-0 flex-col bg-surface-light dark:bg-surface-dark">
+  <div class="relative h-full shrink-0 overflow-hidden bg-surface-light dark:bg-surface-dark" style="width: 100cqi">
     <!-- Dim overlay when drawer is open -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -296,115 +322,167 @@
       onclick={closeDrawer}
       onkeydown={(e) => { if (e.key === "Escape") closeDrawer(); }}
     ></div>
-    <!-- Header -->
-    <header
-      class="relative flex items-center border-b border-border-light px-4 py-3 dark:border-border-dark"
+
+    <!-- Sliding inner: task list + detail view -->
+    <div
+      class="flex h-full {resizing ? '' : 'transition-transform duration-250'} ease-out"
+      style="width: 200%; transform: translateX({selectedTask ? '-50%' : '0'})"
     >
-      <!-- Back arrow (left) -->
-      <button
-        onclick={() => (showDrawer = !showDrawer)}
-        class="absolute left-2 rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
-      >
-        <svg class="h-5 w-5 opacity-60" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" />
-        </svg>
-      </button>
-
-      <!-- Centered title -->
-      <div class="flex-1 text-center">
-        <p class="text-xs text-text-secondary-light dark:text-text-secondary-dark">
-          {app.config?.current_workspace ?? ""}
-        </p>
-        <p class="text-lg font-bold">{app.activeList?.title ?? "Tasks"}</p>
-      </div>
-
-      <!-- Sync spinner (right) -->
-      {#if app.syncing}
-        <div class="absolute right-4 h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-      {/if}
-    </header>
-
-    <!-- Task list -->
-    <main class="flex-1 overflow-y-auto">
-      {#if app.lists.length === 0}
-        <div class="flex h-full flex-col items-center justify-center p-8 text-center">
-          <p class="text-lg font-medium opacity-60">No lists yet</p>
-          <p class="mt-1 text-sm opacity-40">Tap the list name above to create one</p>
-        </div>
-      {:else if !app.activeListId}
-        <div class="flex h-full items-center justify-center opacity-40">
-          Select a list
-        </div>
-      {:else}
-        {#each app.pendingTasks as task (task.id)}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            draggable="true"
-            ondragstart={(e) => handleDragStart(e, task.id)}
-            ondragover={(e) => handleDragOver(e, task.id)}
-            ondragend={handleDragEnd}
-            ondrop={(e) => handleDrop(e, task.id)}
-            class="{dragId === task.id ? 'opacity-30' : ''} {dragOverId === task.id && dragId !== task.id ? 'border-t-2 border-t-primary' : ''}"
-          >
-            <TaskItem {task} />
-          </div>
-        {/each}
-
-        {#if app.pendingTasks.length === 0}
-          <div class="p-8 text-center text-sm opacity-40">No tasks. Add one below.</div>
-        {/if}
-
-        {#if app.completedTasks.length > 0}
-          <div class="h-4"></div>
+      <!-- Sub-panel: Task list -->
+      <div class="relative flex h-full w-1/2 flex-col">
+        <!-- Header / drag region -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <header
+          onmousedown={handleHeaderMouseDown}
+          ondblclick={() => { if (isDesktop) appWindow.toggleMaximize(); }}
+          class="relative flex items-center border-b border-border-light px-4 py-3 dark:border-border-dark"
+        >
+          <!-- Drawer toggle (left) -->
           <button
-            onclick={() => {
-              if (showCompleted) {
-                showCompleted = false;
-                setTimeout(() => (completedVisible = false), 300);
-              } else {
-                completedVisible = true;
-                requestAnimationFrame(() => (showCompleted = true));
-              }
-            }}
-            class="relative z-10 flex w-full items-center justify-between border-t border-border-light bg-surface-light px-4 py-3 text-sm font-medium text-text-secondary-light transition-colors hover:bg-black/5 dark:border-border-dark dark:bg-surface-dark dark:text-text-secondary-dark dark:hover:bg-white/5"
+            onclick={() => (showDrawer = !showDrawer)}
+            class="absolute left-2 rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
           >
-            Completed ({app.completedTasks.length})
-            <svg
-              class="h-4 w-4 transition-transform {showCompleted ? 'rotate-90' : ''}"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-              />
+            <svg class="h-5 w-5 opacity-60" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
             </svg>
           </button>
-          {#if completedVisible}
-            <div class="transition-all duration-300 ease-out {showCompleted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}">
-              {#each app.completedTasks as task (task.id)}
-                <TaskItem {task} />
-              {/each}
+
+          <!-- Centered title -->
+          <div class="flex-1 text-center">
+            <p class="text-xs text-text-secondary-light dark:text-text-secondary-dark">
+              {app.config?.current_workspace ?? ""}
+            </p>
+            <p class="text-lg font-bold">{app.activeList?.title ?? "Tasks"}</p>
+          </div>
+
+          <!-- Window controls (right) -->
+          {#if isDesktop}
+            <div class="absolute right-1.5 flex items-center gap-0.5">
+              {#if isWindows}
+                <button
+                  onclick={() => appWindow.minimize()}
+                  class="rounded p-1.5 opacity-50 hover:bg-black/10 hover:opacity-80 dark:hover:bg-white/10"
+                >
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M4 10a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" />
+                  </svg>
+                </button>
+                <button
+                  onclick={() => appWindow.toggleMaximize()}
+                  class="rounded p-1.5 opacity-50 hover:bg-black/10 hover:opacity-80 dark:hover:bg-white/10"
+                >
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="14" height="14" rx="1" />
+                  </svg>
+                </button>
+              {/if}
+              <button
+                onclick={() => appWindow.close()}
+                class="rounded p-1.5 opacity-50 hover:bg-danger/20 hover:opacity-100 hover:text-danger dark:hover:bg-danger/20"
+              >
+                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
             </div>
           {/if}
-        {/if}
-      {/if}
-    </main>
+        </header>
 
-    <!-- FAB button -->
-    <div
-      class="pointer-events-none absolute bottom-6 left-0 right-0 z-30 flex justify-center transition-all duration-250 ease-out {newTaskState.open ? 'opacity-0 scale-75' : ''} {showDrawer ? 'translate-y-24 opacity-0' : 'translate-y-0 opacity-100'}"
-    >
-      <button
-        onclick={() => { if (app.activeListId) newTaskState.open = true; }}
-        disabled={!app.activeListId}
-        class="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:shadow-none"
-      >
-        <svg class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-        </svg>
-      </button>
+        <!-- Task list -->
+        <main class="flex-1 overflow-y-auto">
+          {#if app.lists.length === 0}
+            <div class="flex h-full flex-col items-center justify-center p-8 text-center">
+              <p class="text-lg font-medium opacity-60">No lists yet</p>
+              <p class="mt-1 text-sm opacity-40">Tap the list name above to create one</p>
+            </div>
+          {:else if !app.activeListId}
+            <div class="flex h-full items-center justify-center opacity-40">
+              Select a list
+            </div>
+          {:else}
+            {#each app.pendingTasks as task (task.id)}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                draggable="true"
+                ondragstart={(e) => handleDragStart(e, task.id)}
+                ondragover={(e) => handleDragOver(e, task.id)}
+                ondragend={handleDragEnd}
+                ondrop={(e) => handleDrop(e, task.id)}
+                class="{dragId === task.id ? 'opacity-30' : ''} {dragOverId === task.id && dragId !== task.id ? 'border-t-2 border-t-primary' : ''}"
+              >
+                <TaskItem {task} onopen={openTask} />
+              </div>
+            {/each}
+
+            {#if app.pendingTasks.length === 0}
+              <div class="p-8 text-center text-sm opacity-40">No tasks. Add one below.</div>
+            {/if}
+
+            {#if app.completedTasks.length > 0}
+              <div class="h-4"></div>
+              <button
+                onclick={() => {
+                  if (showCompleted) {
+                    showCompleted = false;
+                    setTimeout(() => (completedVisible = false), 300);
+                  } else {
+                    completedVisible = true;
+                    requestAnimationFrame(() => (showCompleted = true));
+                  }
+                }}
+                class="relative z-10 flex w-full items-center justify-between border-t border-border-light bg-surface-light px-4 py-3 text-sm font-medium text-text-secondary-light transition-colors hover:bg-black/5 dark:border-border-dark dark:bg-surface-dark dark:text-text-secondary-dark dark:hover:bg-white/5"
+              >
+                Completed ({app.completedTasks.length})
+                <svg
+                  class="h-4 w-4 transition-transform {showCompleted ? 'rotate-90' : ''}"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                  />
+                </svg>
+              </button>
+              {#if completedVisible}
+                <div class="transition-all duration-300 ease-out {showCompleted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}">
+                  {#each app.completedTasks as task (task.id)}
+                    <TaskItem {task} onopen={openTask} />
+                  {/each}
+                </div>
+              {/if}
+            {/if}
+          {/if}
+        </main>
+
+        <!-- FAB button -->
+        <div
+          class="pointer-events-none absolute bottom-6 left-0 right-0 z-20 flex justify-center transition-all duration-250 ease-out {newTaskState.open ? 'opacity-0 scale-75' : ''} {showDrawer || selectedTask ? 'translate-y-24 opacity-0' : 'translate-y-0 opacity-100'}"
+        >
+          <button
+            onclick={() => { if (app.activeListId) newTaskState.open = true; }}
+            disabled={!app.activeListId}
+            class="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:shadow-none"
+          >
+            <svg class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sub-panel: Task detail -->
+      <div class="relative flex h-full w-1/2 flex-col bg-surface-light dark:bg-surface-dark">
+        {#if selectedTask}
+          <TaskDetailView task={selectedTask} onback={closeDetail} />
+        {/if}
+      </div>
     </div>
+
+    <!-- Sync spinner -->
+    {#if app.syncing}
+      <div class="absolute bottom-4 right-4 z-20 h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+    {/if}
   </div>
 </div>
 </div>
@@ -412,7 +490,7 @@
 <!-- Settings popup overlay -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="fixed inset-0 z-50 flex transition-opacity duration-200 {showSettings ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}"
+  class="absolute inset-0 z-50 flex transition-opacity duration-200 {showSettings ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}"
   style="padding: 4%"
 >
   <!-- Backdrop -->
@@ -431,6 +509,6 @@
 </div>
 
 <!-- Toast overlay (outside sliding container so it stays centered) -->
-<div class="pointer-events-none fixed inset-0 z-50">
+<div class="pointer-events-none absolute inset-0 z-50">
   <NewTaskInput />
 </div>

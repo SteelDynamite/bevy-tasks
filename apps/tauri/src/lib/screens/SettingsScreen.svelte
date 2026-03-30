@@ -41,20 +41,19 @@
 </script>
 
 <header
-  class="flex items-center gap-3 border-b border-border-light px-4 py-3 dark:border-border-dark"
+  class="flex items-center justify-between border-b border-border-light px-4 py-3 dark:border-border-dark"
 >
+  <h1 class="text-lg font-bold">Settings</h1>
   <button
     onclick={() => onclose?.()}
     class="rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
   >
     <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
       <path
-        fill-rule="evenodd"
-        d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+        d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
       />
     </svg>
   </button>
-  <h1 class="text-lg font-bold">Settings</h1>
 </header>
 
 <main class="flex-1 overflow-y-auto p-4">
