@@ -93,6 +93,17 @@ pub fn delete(task_id_str: String, workspace: Option<String>) -> Result<()> {
         if let Some(task) = list.tasks.iter().find(|t| t.id == task_id) {
             let title = task.title.clone();
 
+            output::warning(&format!("This will delete task \"{}\"", title));
+            print!("Continue? (y/n): ");
+            use std::io::{self, Write};
+            io::stdout().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            if input.trim().to_lowercase() != "y" {
+                println!("Cancelled");
+                return Ok(());
+            }
+
             repo.delete_task(list.id, task_id)
                 .context("Failed to delete task")?;
 
