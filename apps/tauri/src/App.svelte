@@ -11,10 +11,10 @@
 </script>
 
 <div class={app.darkMode ? "dark" : ""}>
-  <div class="h-screen w-screen p-2">
+  <div class="h-screen w-screen">
     <div
-      class="relative h-full w-full overflow-hidden rounded-xl border border-black/15 bg-surface-light text-text-light dark:border-white/15 dark:bg-surface-dark dark:text-text-dark"
-      style="container-type: inline-size; box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 0 2px rgba(0,0,0,0.1)"
+      class="relative h-full w-full overflow-hidden bg-surface-light text-text-light dark:bg-surface-dark dark:text-text-dark"
+      style="container-type: inline-size"
     >
       {#if app.error}
         <div
