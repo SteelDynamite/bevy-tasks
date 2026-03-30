@@ -157,6 +157,83 @@
 >
   <!-- Drawer panel -->
   <div class="flex h-full shrink-0 flex-col bg-surface-light dark:bg-surface-dark" style="width: 80cqi">
+    <!-- Drawer header: workspace switcher + settings -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      onmousedown={handleHeaderMouseDown}
+      class="flex h-11 shrink-0 items-center justify-between border-b border-border-light px-3 dark:border-border-dark"
+    >
+      <div class="relative min-w-0 flex-1" bind:this={workspacePickerEl}>
+        <button
+          onclick={() => (showWorkspacePicker = !showWorkspacePicker)}
+          class="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-semibold hover:bg-black/5 dark:hover:bg-white/10"
+        >
+          <span class="truncate">{app.config?.current_workspace ?? "Workspace"}</span>
+          <svg class="h-3.5 w-3.5 shrink-0 transition-transform {showWorkspacePicker ? 'rotate-180' : ''}" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" />
+          </svg>
+        </button>
+        {#if showWorkspacePicker}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="absolute left-0 top-full z-40 mt-1 w-full rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark"
+          >
+            {#each workspaceNames as name}
+              {@const ws = app.config?.workspaces[name]}
+              <div class="group flex items-center px-1 hover:bg-black/5 dark:hover:bg-white/10">
+                <button
+                  onclick={() => { app.switchWorkspace(name); showWorkspacePicker = false; }}
+                  class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left {name === app.config?.current_workspace ? 'font-bold' : ''}"
+                >
+                  {#if name === app.config?.current_workspace}
+                    <svg class="h-4 w-4 shrink-0 opacity-50" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                    </svg>
+                  {/if}
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm">{name}</p>
+                    <p class="truncate text-xs opacity-40">{ws?.path ?? ""}</p>
+                  </div>
+                </button>
+                <div class="relative shrink-0" data-ws-menu>
+                  <button
+                    onclick={(e) => { e.stopPropagation(); wsMenuName = wsMenuName === name ? null : name; }}
+                    class="rounded p-1 opacity-0 transition-opacity group-hover:opacity-40 hover:!opacity-80 {wsMenuName === name ? '!opacity-80' : ''}"
+                  >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                    </svg>
+                  </button>
+                  {#if wsMenuName === name}
+                    <div class="absolute right-0 top-full z-40 mt-1 min-w-[140px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+                      <button
+                        onclick={() => { wsMenuName = null; if (confirm(`Remove workspace "${name}"? (Files remain on disk)`)) app.removeWorkspace(name); }}
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
+                      >
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+            <div class="mt-1 border-t border-border-light px-1 pt-1 dark:border-border-dark">
+              <button
+                onclick={() => { showWorkspacePicker = false; app.setScreen("setup"); }}
+                class="w-full rounded-md px-2 py-1.5 text-left text-sm text-primary hover:bg-primary/5"
+              >
+                + Add workspace
+              </button>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+    </div>
+
     <!-- List items + new list button -->
     <div class="flex-1 overflow-y-auto py-2">
       {#each app.lists as list (list.id)}
@@ -228,93 +305,20 @@
       </div>
     </div>
 
-    <!-- Footer: workspace switcher (left) + settings gear (right) -->
-    <div class="flex items-center justify-between border-t border-border-light px-3 py-2 dark:border-border-dark">
-      <!-- Workspace switcher (custom drop-up) -->
-      <div class="relative min-w-0 flex-1" bind:this={workspacePickerEl}>
-        <button
-          onclick={() => (showWorkspacePicker = !showWorkspacePicker)}
-          class="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm opacity-60 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
-        >
-          <svg class="h-3.5 w-3.5 shrink-0 transition-transform {showWorkspacePicker ? 'rotate-180' : ''}" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" />
-          </svg>
-          <span class="truncate">{app.config?.current_workspace ?? "Workspace"}</span>
-        </button>
-        {#if showWorkspacePicker}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="absolute bottom-full left-0 mb-1 w-full rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark"
-          >
-            {#each workspaceNames as name}
-              {@const ws = app.config?.workspaces[name]}
-              <div class="group flex items-center px-1 hover:bg-black/5 dark:hover:bg-white/10">
-                <button
-                  onclick={() => { app.switchWorkspace(name); showWorkspacePicker = false; }}
-                  class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left {name === app.config?.current_workspace ? 'font-bold' : ''}"
-                >
-                  {#if name === app.config?.current_workspace}
-                    <svg class="h-4 w-4 shrink-0 opacity-50" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                    </svg>
-                  {/if}
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm">{name}</p>
-                    <p class="truncate text-xs opacity-40">{ws?.path ?? ""}</p>
-                  </div>
-                </button>
-                <div class="relative shrink-0" data-ws-menu>
-                  <button
-                    onclick={(e) => { e.stopPropagation(); wsMenuName = wsMenuName === name ? null : name; }}
-                    class="rounded p-1 opacity-0 transition-opacity group-hover:opacity-40 hover:!opacity-80 {wsMenuName === name ? '!opacity-80' : ''}"
-                  >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                    </svg>
-                  </button>
-                  {#if wsMenuName === name}
-                    <div class="absolute right-0 top-full z-40 mt-1 min-w-[140px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
-                      <button
-                        onclick={() => { wsMenuName = null; if (confirm(`Remove workspace "${name}"? (Files remain on disk)`)) app.removeWorkspace(name); }}
-                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
-                      >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                        </svg>
-                        Delete
-                      </button>
-                    </div>
-                  {/if}
-                </div>
-              </div>
-            {/each}
-            <div class="mt-1 border-t border-border-light px-1 pt-1 dark:border-border-dark">
-              <button
-                onclick={() => { showWorkspacePicker = false; app.setScreen("setup"); }}
-                class="w-full rounded-md px-2 py-1.5 text-left text-sm text-primary hover:bg-primary/5"
-              >
-                + Add workspace
-              </button>
-            </div>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Settings gear -->
-      <button
-        onclick={openSettings}
-        class="rounded-lg p-2 hover:bg-black/5 dark:hover:bg-white/10"
-        title="Settings"
-      >
-        <svg class="h-5 w-5 opacity-50 hover:opacity-80" viewBox="0 0 20 20" fill="currentColor">
-          <path
-            fill-rule="evenodd"
-            d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-            clip-rule="evenodd"
-          />
-        </svg>
-      </button>
-    </div>
+    <!-- Settings -->
+    <button
+      onclick={openSettings}
+      class="flex shrink-0 items-center gap-2 border-t border-border-light px-5 py-3 text-sm opacity-50 hover:bg-black/5 hover:opacity-80 dark:border-border-dark dark:hover:bg-white/10"
+    >
+      <svg class="h-4.5 w-4.5" viewBox="0 0 20 20" fill="currentColor">
+        <path
+          fill-rule="evenodd"
+          d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      Settings
+    </button>
   </div>
 
   <!-- Main content panel -->
@@ -339,7 +343,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <header
           onmousedown={handleHeaderMouseDown}
-          class="relative flex items-center border-b border-border-light px-4 py-3 dark:border-border-dark"
+          class="relative flex h-11 items-center border-b border-border-light px-4 dark:border-border-dark"
         >
           <!-- Drawer toggle (left) -->
           <button
@@ -353,10 +357,7 @@
 
           <!-- Centered title -->
           <div class="flex-1 text-center">
-            <p class="text-xs text-text-secondary-light dark:text-text-secondary-dark">
-              {app.config?.current_workspace ?? ""}
-            </p>
-            <p class="text-lg font-bold">{app.activeList?.title ?? "Tasks"}</p>
+            <p class="text-sm font-semibold leading-tight">{app.activeList?.title ?? "Tasks"}</p>
           </div>
 
           <!-- Window controls (right) -->

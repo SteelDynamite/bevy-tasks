@@ -87,7 +87,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <header
   onmousedown={handleHeaderMouseDown}
-  class="flex items-center justify-between border-b border-border-light px-4 py-3 dark:border-border-dark"
+  class="flex h-11 items-center border-b border-border-light px-4 dark:border-border-dark"
 >
   <button
     onclick={onback}
@@ -97,9 +97,12 @@
       <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" />
     </svg>
   </button>
+</header>
 
+<!-- Content -->
+<main class="relative flex-1 overflow-y-auto px-4 pt-4">
   <!-- Kebab menu -->
-  <div class="relative" bind:this={menuEl}>
+  <div class="absolute right-3 top-2" bind:this={menuEl}>
     <button
       onclick={() => (showMenu = !showMenu)}
       class="rounded-lg p-1.5 opacity-50 hover:bg-black/5 hover:opacity-80 dark:hover:bg-white/10"
@@ -109,7 +112,20 @@
       </svg>
     </button>
     {#if showMenu}
-      <div class="absolute right-0 top-full z-40 mt-1 min-w-[140px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+      <div class="absolute right-0 top-full z-40 mt-1 min-w-[200px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+        <button
+          onclick={handleToggle}
+          class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            {#if isCompleted}
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            {:else}
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            {/if}
+          </svg>
+          {isCompleted ? "Restore task" : "Mark as completed"}
+        </button>
         <button
           onclick={handleDelete}
           class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
@@ -122,10 +138,6 @@
       </div>
     {/if}
   </div>
-</header>
-
-<!-- Content -->
-<main class="flex-1 overflow-y-auto px-4 pt-4">
   <!-- Title -->
   <input
     type="text"
@@ -175,16 +187,6 @@
     {/if}
   </div>
 </main>
-
-<!-- Bottom action -->
-<div class="border-t border-border-light px-4 py-3 dark:border-border-dark">
-  <button
-    onclick={handleToggle}
-    class="w-full text-center text-sm font-medium text-primary hover:opacity-70"
-  >
-    {isCompleted ? "Restore task" : "Mark as completed"}
-  </button>
-</div>
 
 <!-- Date picker overlay -->
 {#if showDatePicker}
