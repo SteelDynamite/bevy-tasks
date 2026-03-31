@@ -126,15 +126,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy-tasks-flutter-bridge"
+name = "bevy-tasks-flutter"
 version = "0.1.0"
 dependencies = [
  "bevy-tasks-core",
  "chrono",
  "flutter_rust_bridge",
- "serde",
- "serde_json",
- "tokio",
+ "once_cell",
  "uuid",
 ]
 
