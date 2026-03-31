@@ -1,10 +1,10 @@
 [package]
-name = "bevy-tasks-core"
+name = "onyx-core"
 version = "0.1.0"
 edition = "2021"
 description = "Core library for local-first task management with markdown storage and WebDAV sync"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/SteelDynamite/bevy-tasks"
+repository = "https://github.com/SteelDynamite/onyx"
 
 [dependencies]
 serde = { workspace = true }
