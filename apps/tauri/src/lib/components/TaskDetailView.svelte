@@ -14,9 +14,12 @@
   let title = $state(task.title);
   let description = $state(task.description);
   let showMenu = $state(false);
+  let showMoveSubmenu = $state(false);
   let menuEl = $state<HTMLDivElement | null>(null);
   let showDatePicker = $state(false);
   let saveTimer: ReturnType<typeof setTimeout>;
+
+  let otherLists = $derived(app.lists.filter((l) => l.id !== app.activeListId));
 
   function handleHeaderMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
@@ -126,6 +129,34 @@
           </svg>
           {isCompleted ? "Restore task" : "Mark as completed"}
         </button>
+        {#if otherLists.length > 0}
+          <div class="relative">
+            <button
+              onclick={() => (showMoveSubmenu = !showMoveSubmenu)}
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+              </svg>
+              Move to...
+              <svg class="ml-auto h-3 w-3 opacity-40" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" />
+              </svg>
+            </button>
+            {#if showMoveSubmenu}
+              <div class="absolute left-full top-0 z-50 ml-1 min-w-[160px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+                {#each otherLists as list}
+                  <button
+                    onclick={async () => { showMenu = false; showMoveSubmenu = false; await app.moveTask(task.id, list.id); onback(); }}
+                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                  >
+                    {list.title}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
         <button
           onclick={handleDelete}
           class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"

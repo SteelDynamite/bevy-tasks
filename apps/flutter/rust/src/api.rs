@@ -1,12 +1,15 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
+use flutter_rust_bridge::frb;
+use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 use onyx_core::{
     config::{AppConfig, WorkspaceConfig},
-    models::{Task, TaskList, TaskStatus},
+    models::{Task, TaskStatus},
     repository::TaskRepository,
 };
 
@@ -158,6 +161,7 @@ pub fn get_lists() -> Result<Vec<TaskListDto>, String> {
 pub fn create_list(name: String) -> Result<TaskListDto, String> {
     let mut s = STATE.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher();
     let list = s.repo.as_mut().unwrap().create_list(name).map_err(|e| e.to_string())?;
     Ok(TaskListDto {
         id: list.id.to_string(),
@@ -171,6 +175,7 @@ pub fn create_list(name: String) -> Result<TaskListDto, String> {
 pub fn delete_list(list_id: String) -> Result<(), String> {
     let mut s = STATE.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher();
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     s.repo.as_mut().unwrap().delete_list(id).map_err(|e| e.to_string())
 }
@@ -188,6 +193,7 @@ pub fn list_tasks(list_id: String) -> Result<Vec<TaskDto>, String> {
 pub fn create_task(list_id: String, title: String, description: String) -> Result<TaskDto, String> {
     let mut s = STATE.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher();
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let mut task = Task::new(title);
     if !description.is_empty() {
@@ -200,6 +206,7 @@ pub fn create_task(list_id: String, title: String, description: String) -> Resul
 pub fn update_task(list_id: String, task: TaskDto) -> Result<(), String> {
     let mut s = STATE.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher();
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task.id).map_err(|e| e.to_string())?;
 
@@ -218,6 +225,7 @@ pub fn update_task(list_id: String, task: TaskDto) -> Result<(), String> {
 pub fn delete_task(list_id: String, task_id: String) -> Result<(), String> {
     let mut s = STATE.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher();
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
     s.repo.as_mut().unwrap().delete_task(lid, tid).map_err(|e| e.to_string())
@@ -226,6 +234,7 @@ pub fn delete_task(list_id: String, task_id: String) -> Result<(), String> {
 pub fn toggle_task(list_id: String, task_id: String) -> Result<TaskDto, String> {
     let mut s = STATE.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher();
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
     let repo = s.repo.as_mut().unwrap();
@@ -241,6 +250,7 @@ pub fn toggle_task(list_id: String, task_id: String) -> Result<TaskDto, String> 
 pub fn reorder_task(list_id: String, task_id: String, new_position: u32) -> Result<(), String> {
     let mut s = STATE.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher();
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
     s.repo
@@ -248,6 +258,79 @@ pub fn reorder_task(list_id: String, task_id: String, new_position: u32) -> Resu
         .unwrap()
         .reorder_task(lid, tid, new_position as usize)
         .map_err(|e| e.to_string())
+}
+
+// ── Move / rename / grouping ───────────────────────────────────────
+
+pub fn move_task(from_list_id: String, to_list_id: String, task_id: String) -> Result<(), String> {
+    let mut s = STATE.lock().unwrap();
+    ensure_repo(&mut s)?;
+    mute_watcher();
+    let from = Uuid::parse_str(&from_list_id).map_err(|e| e.to_string())?;
+    let to = Uuid::parse_str(&to_list_id).map_err(|e| e.to_string())?;
+    let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
+    s.repo.as_mut().unwrap().move_task(from, to, tid).map_err(|e| e.to_string())
+}
+
+pub fn rename_list(list_id: String, new_name: String) -> Result<(), String> {
+    let mut s = STATE.lock().unwrap();
+    ensure_repo(&mut s)?;
+    mute_watcher();
+    let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
+    s.repo.as_mut().unwrap().rename_list(id, new_name).map_err(|e| e.to_string())
+}
+
+pub fn set_group_by_due_date(list_id: String, enabled: bool) -> Result<(), String> {
+    let mut s = STATE.lock().unwrap();
+    ensure_repo(&mut s)?;
+    mute_watcher();
+    let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
+    s.repo.as_mut().unwrap().set_group_by_due_date(id, enabled).map_err(|e| e.to_string())
+}
+
+pub fn get_group_by_due_date(list_id: String) -> Result<bool, String> {
+    let mut s = STATE.lock().unwrap();
+    ensure_repo(&mut s)?;
+    let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
+    s.repo.as_ref().unwrap().get_group_by_due_date(id).map_err(|e| e.to_string())
+}
+
+// ── File watcher ───────────────────────────────────────────────────
+
+static WATCHER: Mutex<Option<notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>>> =
+    Mutex::new(None);
+
+static LAST_WRITE: Mutex<Option<Instant>> = Mutex::new(None);
+
+fn mute_watcher() {
+    *LAST_WRITE.lock().unwrap() = Some(Instant::now());
+}
+
+#[frb(stream_dart_await)]
+pub fn watch_workspace_changes(path: String, sink: crate::frb_generated::StreamSink<()>) {
+    let debouncer = new_debouncer(
+        Duration::from_millis(500),
+        move |events: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| {
+            let Ok(events) = events else { return };
+            let has_data_change = events.iter().any(|e| {
+                if e.kind != DebouncedEventKind::Any { return false; }
+                let p = e.path.to_string_lossy();
+                p.ends_with(".md") || p.ends_with(".json")
+            });
+            if !has_data_change { return; }
+            if let Some(t) = *LAST_WRITE.lock().unwrap() {
+                if t.elapsed() < Duration::from_secs(1) { return; }
+            }
+            let _ = sink.add(());
+        },
+    );
+    match debouncer {
+        Ok(mut d) => {
+            let _ = d.watcher().watch(&PathBuf::from(&path), notify::RecursiveMode::Recursive);
+            *WATCHER.lock().unwrap() = Some(d);
+        }
+        Err(e) => eprintln!("Failed to start file watcher: {e}"),
+    }
 }
 
 // ── Test function ───────────────────────────────────────────────────

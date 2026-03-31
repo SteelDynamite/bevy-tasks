@@ -6,7 +6,7 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `config_to_dto`, `ensure_repo`, `task_to_dto`
+// These functions are ignored because they are not marked as `pub`: `config_to_dto`, `ensure_repo`, `mute_watcher`, `task_to_dto`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AppState`
 
 Future<AppConfigDto> getConfig() => RustLib.instance.api.crateApiGetConfig();
@@ -62,6 +62,33 @@ Future<void> reorderTask({
   taskId: taskId,
   newPosition: newPosition,
 );
+
+Future<void> moveTask({
+  required String fromListId,
+  required String toListId,
+  required String taskId,
+}) => RustLib.instance.api.crateApiMoveTask(
+  fromListId: fromListId,
+  toListId: toListId,
+  taskId: taskId,
+);
+
+Future<void> renameList({required String listId, required String newName}) =>
+    RustLib.instance.api.crateApiRenameList(listId: listId, newName: newName);
+
+Future<void> setGroupByDueDate({
+  required String listId,
+  required bool enabled,
+}) => RustLib.instance.api.crateApiSetGroupByDueDate(
+  listId: listId,
+  enabled: enabled,
+);
+
+Future<bool> getGroupByDueDate({required String listId}) =>
+    RustLib.instance.api.crateApiGetGroupByDueDate(listId: listId);
+
+Future<Stream<void>> watchWorkspaceChanges({required String path}) =>
+    RustLib.instance.api.crateApiWatchWorkspaceChanges(path: path);
 
 Future<String> greet({required String name}) =>
     RustLib.instance.api.crateApiGreet(name: name);

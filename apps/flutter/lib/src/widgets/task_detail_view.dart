@@ -118,6 +118,39 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
     return '$day, ${pad(local.day)}/${pad(local.month)}$timePart';
   }
 
+  void _showMoveToSheet(BuildContext context, AppState state) {
+    final otherLists = state.lists.where((l) => l.id != state.activeListId).toList();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Move to...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            for (final list in otherLists)
+              ListTile(
+                title: Text(list.title, style: const TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  state.moveTask(widget.task.id, list.id);
+                  state.selectTask(null);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -317,6 +350,15 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
                                       state.selectTask(null);
                                     },
                                   ),
+                                  if (state.lists.where((l) => l.id != state.activeListId).isNotEmpty)
+                                    _KebabMenuItem(
+                                      icon: Icons.drive_file_move_outline,
+                                      label: 'Move to...',
+                                      onTap: () {
+                                        setState(() => _showMenu = false);
+                                        _showMoveToSheet(context, state);
+                                      },
+                                    ),
                                   _KebabMenuItem(
                                     icon: Icons.delete_outline,
                                     label: 'Delete',

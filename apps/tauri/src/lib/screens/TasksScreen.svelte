@@ -44,6 +44,8 @@
   let completedVisible = $state(false);
   let listMenuId = $state<string | null>(null);
   let wsMenuName = $state<string | null>(null);
+  let renamingListId = $state<string | null>(null);
+  let renameValue = $state("");
   let dragId = $state<string | null>(null);
   let dragOverId = $state<string | null>(null);
   let resizing = $state(false);
@@ -75,6 +77,40 @@
     const list = app.lists.find(l => l.id === id);
     if (!confirm(`Delete list "${list?.title ?? id}" and all its tasks?`)) return;
     await app.deleteList(id);
+  }
+
+  function startRenameList(id: string) {
+    listMenuId = null;
+    const list = app.lists.find(l => l.id === id);
+    if (!list) return;
+    renamingListId = id;
+    renameValue = list.title;
+  }
+
+  async function handleRenameList() {
+    if (!renamingListId || !renameValue.trim()) { renamingListId = null; return; }
+    const list = app.lists.find(l => l.id === renamingListId);
+    if (renameValue.trim() !== list?.title) {
+      await app.renameList(renamingListId, renameValue.trim());
+    }
+    renamingListId = null;
+  }
+
+  async function handleToggleGroupByDueDate(id: string) {
+    listMenuId = null;
+    const list = app.lists.find(l => l.id === id);
+    if (!list) return;
+    await app.setGroupByDueDate(id, !list.group_by_due_date);
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key !== "Escape") return;
+    if (showSettings) { showSettings = false; return; }
+    if (selectedTaskId) { selectedTaskId = null; return; }
+    if (showDrawer) { closeDrawer(); return; }
+    if (listMenuId) { listMenuId = null; return; }
+    if (wsMenuName) { wsMenuName = null; return; }
+    if (showWorkspacePicker) { showWorkspacePicker = false; return; }
   }
 
   function handleDragStart(e: DragEvent, taskId: string) {
@@ -147,6 +183,8 @@
   let workspaceNames = $derived(app.config ? Object.keys(app.config.workspaces) : []);
   let translateX = $derived(showDrawer ? '0' : '-80cqi');
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <!-- Viewport clip -->
 <div class="h-full w-full overflow-hidden">
@@ -238,17 +276,30 @@
     <div class="flex-1 overflow-y-auto py-2">
       {#each app.lists as list (list.id)}
         <div class="group relative flex items-center px-2 hover:bg-black/5 dark:hover:bg-white/10">
-          <button
-            onclick={() => { app.selectList(list.id); closeDrawer(); }}
-            class="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm {list.id === app.activeListId ? 'font-bold' : ''}"
-          >
-            {#if list.id === app.activeListId}
-              <svg class="h-4 w-4 shrink-0 opacity-50" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-              </svg>
-            {/if}
-            <span>{list.title}</span>
-          </button>
+          {#if renamingListId === list.id}
+            <div class="flex flex-1 items-center px-3 py-1">
+              <input
+                type="text"
+                bind:value={renameValue}
+                class="w-full rounded border border-primary bg-transparent px-2 py-1.5 text-sm outline-none"
+                onkeydown={(e) => { if (e.key === "Enter") handleRenameList(); if (e.key === "Escape") renamingListId = null; }}
+                onblur={handleRenameList}
+                autofocus
+              />
+            </div>
+          {:else}
+            <button
+              onclick={() => { app.selectList(list.id); closeDrawer(); }}
+              class="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm {list.id === app.activeListId ? 'font-bold' : ''}"
+            >
+              {#if list.id === app.activeListId}
+                <svg class="h-4 w-4 shrink-0 opacity-50" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                </svg>
+              {/if}
+              <span>{list.title}</span>
+            </button>
+          {/if}
           <div class="relative shrink-0" data-list-menu>
             <button
               onclick={() => (listMenuId = listMenuId === list.id ? null : list.id)}
@@ -259,7 +310,30 @@
               </svg>
             </button>
             {#if listMenuId === list.id}
-              <div class="absolute right-0 top-full z-40 mt-1 min-w-[140px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+              <div class="absolute right-0 top-full z-40 mt-1 min-w-[180px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+                <button
+                  onclick={() => startRenameList(list.id)}
+                  class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                  Rename
+                </button>
+                <button
+                  onclick={() => handleToggleGroupByDueDate(list.id)}
+                  class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+                  </svg>
+                  Group by due date
+                  {#if list.group_by_due_date}
+                    <svg class="ml-auto h-4 w-4 text-primary" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                    </svg>
+                  {/if}
+                </button>
                 <button
                   onclick={() => handleDeleteList(list.id)}
                   class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"

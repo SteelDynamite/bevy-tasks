@@ -68,6 +68,17 @@ impl TaskRepository {
         self.storage.delete_list(list_id)
     }
 
+    pub fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()> {
+        self.storage.rename_list(list_id, new_name)
+    }
+
+    pub fn move_task(&mut self, from_list_id: Uuid, to_list_id: Uuid, task_id: Uuid) -> Result<()> {
+        let task = self.storage.read_task(from_list_id, task_id)?;
+        self.storage.write_task(to_list_id, &task)?;
+        self.storage.delete_task(from_list_id, task_id)?;
+        Ok(())
+    }
+
     // Task ordering
     pub fn reorder_task(&mut self, list_id: Uuid, task_id: Uuid, new_position: usize) -> Result<()> {
         let mut metadata = self.storage.read_list_metadata(list_id)?;
@@ -318,6 +329,54 @@ mod tests {
 
         let lists = repo.get_lists().unwrap();
         assert!(lists.is_empty());
+    }
+
+    #[test]
+    fn test_move_task_between_lists() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let list_a = repo.create_list("List A".to_string()).unwrap();
+        let list_b = repo.create_list("List B".to_string()).unwrap();
+        let task = repo.create_task(list_a.id, Task::new("Movable".to_string())).unwrap();
+
+        repo.move_task(list_a.id, list_b.id, task.id).unwrap();
+
+        let tasks_a = repo.list_tasks(list_a.id).unwrap();
+        assert_eq!(tasks_a.len(), 0);
+
+        let tasks_b = repo.list_tasks(list_b.id).unwrap();
+        assert_eq!(tasks_b.len(), 1);
+        assert_eq!(tasks_b[0].title, "Movable");
+    }
+
+    #[test]
+    fn test_rename_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        let list = repo.create_list("Old Name".to_string()).unwrap();
+        repo.rename_list(list.id, "New Name".to_string()).unwrap();
+
+        let renamed = repo.get_list(list.id).unwrap();
+        assert_eq!(renamed.title, "New Name");
+
+        // Old directory should be gone
+        assert!(!temp_dir.path().join("Old Name").exists());
+        assert!(temp_dir.path().join("New Name").exists());
+    }
+
+    #[test]
+    fn test_rename_list_duplicate_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut repo = TaskRepository::init(temp_dir.path().to_path_buf()).unwrap();
+
+        repo.create_list("A".to_string()).unwrap();
+        let list_b = repo.create_list("B".to_string()).unwrap();
+
+        let result = repo.rename_list(list_b.id, "A".to_string());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::InvalidData(_)));
     }
 
     #[test]

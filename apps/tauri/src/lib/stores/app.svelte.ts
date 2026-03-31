@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type {
   AppConfig,
   Task,
@@ -6,6 +7,11 @@ import type {
   Screen,
   SyncResult,
 } from "../types";
+
+// Listen for file system changes from the backend watcher
+listen("fs-changed", () => {
+  loadLists();
+});
 
 // ── Reactive state ───────────────────────────────────────────────────
 
@@ -54,6 +60,7 @@ async function addWorkspace(name: string, path: string) {
     await invoke("add_workspace", { name, path });
     config = await invoke<AppConfig>("get_config");
     await loadLists();
+    invoke("watch_workspace", { path }).catch(() => {});
     screen = "tasks";
     error = null;
   } catch (e) {
@@ -67,6 +74,8 @@ async function switchWorkspace(name: string) {
     config = await invoke<AppConfig>("get_config");
     activeListId = null;
     await loadLists();
+    const ws = config?.workspaces[name];
+    if (ws) invoke("watch_workspace", { path: ws.path }).catch(() => {});
     error = null;
   } catch (e) {
     error = String(e);
@@ -206,6 +215,43 @@ async function deleteTask(taskId: string) {
   }
 }
 
+async function moveTask(taskId: string, targetListId: string) {
+  if (!activeListId) return;
+  try {
+    await invoke("move_task", {
+      fromListId: activeListId,
+      toListId: targetListId,
+      taskId,
+    });
+    tasks = tasks.filter((t) => t.id !== taskId);
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function renameList(listId: string, newName: string) {
+  try {
+    await invoke("rename_list", { listId, newName });
+    lists = lists.map((l) =>
+      l.id === listId ? { ...l, title: newName } : l,
+    );
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function setGroupByDueDate(listId: string, enabled: boolean) {
+  try {
+    await invoke("set_group_by_due_date", { listId, enabled });
+    lists = lists.map((l) =>
+      l.id === listId ? { ...l, group_by_due_date: enabled } : l,
+    );
+    if (listId === activeListId) await loadTasks();
+  } catch (e) {
+    error = String(e);
+  }
+}
+
 async function triggerSync() {
   if (!config?.current_workspace) return;
   const ws = config.workspaces[config.current_workspace];
@@ -300,6 +346,9 @@ export const app = {
   updateTask,
   reorderTask,
   deleteTask,
+  moveTask,
+  renameList,
+  setGroupByDueDate,
   triggerSync,
   toggleDarkMode,
   setScreen,
