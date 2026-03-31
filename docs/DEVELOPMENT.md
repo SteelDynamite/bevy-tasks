@@ -13,8 +13,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/SteelDynamite/bevy-tasks.git
-cd bevy-tasks
+git clone https://github.com/SteelDynamite/onyx.git
+cd onyx
 
 # Build the project
 cargo build
@@ -23,7 +23,7 @@ cargo build
 cargo test
 
 # Run the CLI
-cargo run -p bevy-tasks-cli -- --help
+cargo run -p onyx-cli -- --help
 
 # Run the Tauri GUI
 cd apps/tauri && npm install
@@ -33,10 +33,10 @@ npm run tauri dev
 ## Project Structure
 
 ```
-bevy-tasks/
+onyx/
 ├── Cargo.toml                          # Workspace manifest
 ├── crates/
-│   ├── bevy-tasks-core/                # Core library
+│   ├── onyx-core/                # Core library
 │   │   ├── src/
 │   │   │   ├── lib.rs                  # Library entry point
 │   │   │   ├── models.rs               # Data models (Task, TaskList, etc.)
@@ -47,7 +47,7 @@ bevy-tasks/
 │   │   │   ├── sync.rs                 # Three-way sync engine with offline queue
 │   │   │   └── webdav.rs               # WebDAV client and credential storage
 │   │   └── Cargo.toml
-│   ├── bevy-tasks-cli/                 # CLI application
+│   ├── onyx-cli/                 # CLI application
 │   │   ├── src/
 │   │   │   ├── main.rs                 # CLI entry point and command parsing
 │   │   │   ├── output.rs               # Output formatting utilities
@@ -95,10 +95,10 @@ bevy-tasks/
 cargo test
 
 # Run tests for a specific crate
-cargo test -p bevy-tasks-core
+cargo test -p onyx-core
 
 # Run a specific test
-cargo test -p bevy-tasks-core test_create_and_list_tasks
+cargo test -p onyx-core test_create_and_list_tasks
 
 # Run tests with output
 cargo test -- --nocapture
@@ -114,17 +114,17 @@ cargo build
 cargo build --release
 
 # Build specific crate
-cargo build -p bevy-tasks-cli
+cargo build -p onyx-cli
 ```
 
 ### Running the CLI in Development
 
 ```bash
 # Run with cargo (recommended for development)
-cargo run -p bevy-tasks-cli -- init ~/test-tasks --name test
+cargo run -p onyx-cli -- init ~/test-tasks --name test
 
 # Run the compiled binary
-./target/debug/bevy-tasks init ~/test-tasks --name test
+./target/debug/onyx init ~/test-tasks --name test
 ```
 
 ## Code Style
@@ -155,7 +155,7 @@ cargo clippy -- -W clippy::all
 
 ## Architecture Guidelines
 
-### Core Library (`bevy-tasks-core`)
+### Core Library (`onyx-core`)
 
 **Principles:**
 - Pure Rust, no CLI dependencies
@@ -171,7 +171,7 @@ cargo clippy -- -W clippy::all
 4. Write tests
 5. Update API documentation
 
-### CLI (`bevy-tasks-cli`)
+### CLI (`onyx-cli`)
 
 **Principles:**
 - Thin layer over core library
@@ -210,8 +210,8 @@ mod tests {
 Located in `tests/` directories within each crate:
 
 ```rust
-// crates/bevy-tasks-core/tests/integration_test.rs
-use bevy_tasks_core::*;
+// crates/onyx-core/tests/integration_test.rs
+use onyx_core::*;
 
 #[test]
 fn test_full_workflow() {
@@ -321,13 +321,13 @@ ls -la ~/test-tasks
 
 ```bash
 # Verify workspace configuration
-cat ~/.config/bevy-tasks/config.json | jq
+cat ~/.config/onyx/config.json | jq
 
 # Check current workspace
-cargo run -p bevy-tasks-cli -- workspace list
+cargo run -p onyx-cli -- workspace list
 
 # Initialize if needed
-cargo run -p bevy-tasks-cli -- init ~/test-tasks --name test
+cargo run -p onyx-cli -- init ~/test-tasks --name test
 ```
 
 ## Contributing

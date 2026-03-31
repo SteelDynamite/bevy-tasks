@@ -1,8 +1,8 @@
-# Bevy Tasks Core - API Documentation
+# Onyx Core - API Documentation
 
 ## Overview
 
-The `bevy-tasks-core` library provides a complete backend for managing tasks in a local-first manner. Tasks are stored as markdown files with YAML frontmatter, compatible with Obsidian and other markdown editors.
+The `onyx-core` library provides a complete backend for managing tasks in a local-first manner. Tasks are stored as markdown files with YAML frontmatter, compatible with Obsidian and other markdown editors.
 
 ## Core Concepts
 
@@ -33,7 +33,7 @@ pub enum TaskStatus {
 **Creating a Task:**
 
 ```rust
-use bevy_tasks_core::Task;
+use onyx_core::Task;
 
 // Simple task
 let task = Task::new("Buy groceries".to_string());
@@ -73,14 +73,14 @@ pub struct AppConfig {
 ```
 
 **Location:**
-- Windows: `%APPDATA%/bevy-tasks/config.json`
-- Linux: `~/.config/bevy-tasks/config.json`
-- macOS: `~/Library/Application Support/bevy-tasks/config.json`
+- Windows: `%APPDATA%/onyx/config.json`
+- Linux: `~/.config/onyx/config.json`
+- macOS: `~/Library/Application Support/onyx/config.json`
 
 **Usage:**
 
 ```rust
-use bevy_tasks_core::AppConfig;
+use onyx_core::AppConfig;
 
 // Load config
 let config_path = AppConfig::get_config_path();
@@ -116,7 +116,7 @@ The main interface for interacting with tasks and lists.
 ### Initialization
 
 ```rust
-use bevy_tasks_core::TaskRepository;
+use onyx_core::TaskRepository;
 use std::path::PathBuf;
 
 // Open existing repository
@@ -280,12 +280,12 @@ The sync module provides bi-directional WebDAV synchronization with three-way di
 
 ### Sync Functions
 
-Sync functions live in the `bevy_tasks_core::sync` module as standalone functions (not on `TaskRepository`).
+Sync functions live in the `onyx_core::sync` module as standalone functions (not on `TaskRepository`).
 
 #### Sync a Workspace
 
 ```rust
-use bevy_tasks_core::sync::{sync_workspace, SyncMode};
+use onyx_core::sync::{sync_workspace, SyncMode};
 use std::path::Path;
 
 // Full bi-directional sync
@@ -305,7 +305,7 @@ sync_workspace(path, url, user, pass, SyncMode::PullOnly).await?;
 #### Check Sync Status
 
 ```rust
-use bevy_tasks_core::sync::get_sync_status;
+use onyx_core::sync::get_sync_status;
 
 let status = get_sync_status(Path::new("/home/user/tasks"))?;
 // Returns SyncStatusInfo with last sync time, pending changes, etc.
@@ -316,7 +316,7 @@ let status = get_sync_status(Path::new("/home/user/tasks"))?;
 Credentials are stored in the platform keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service).
 
 ```rust
-use bevy_tasks_core::webdav::{store_credentials, load_credentials, delete_credentials};
+use onyx_core::webdav::{store_credentials, load_credentials, delete_credentials};
 
 // Store credentials
 store_credentials("nextcloud.example.com", "username", "password")?;
@@ -331,7 +331,7 @@ delete_credentials("nextcloud.example.com")?;
 ### WebDAV Client
 
 ```rust
-use bevy_tasks_core::webdav::WebDavClient;
+use onyx_core::webdav::WebDavClient;
 
 let client = WebDavClient::new(
     "https://nextcloud.example.com/remote.php/dav/files/user/Tasks",
@@ -380,7 +380,7 @@ pub enum Error {
 ## Example: Complete Workflow
 
 ```rust
-use bevy_tasks_core::{TaskRepository, Task, AppConfig, WorkspaceConfig};
+use onyx_core::{TaskRepository, Task, AppConfig, WorkspaceConfig};
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -428,7 +428,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 The core library includes comprehensive tests. Run them with:
 
 ```bash
-cargo test -p bevy-tasks-core
+cargo test -p onyx-core
 ```
 
 Key test areas:

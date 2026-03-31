@@ -1,4 +1,4 @@
-# Bevy Tasks
+# Onyx
 
 A **local-first, cross-platform tasks application** built with Rust. Inspired by Google Tasks, designed for speed and flexibility.
 
@@ -12,13 +12,13 @@ A **local-first, cross-platform tasks application** built with Rust. Inspired by
 ## Project Structure
 
 ```
-bevy-tasks/
+onyx/
 ├── Cargo.toml                    # Workspace definition
 ├── PLAN.md                       # Detailed project plan
 ├── README.md                     # This file
 ├── crates/
-│   ├── bevy-tasks-core/          # Core library (backend)
-│   └── bevy-tasks-cli/           # CLI frontend
+│   ├── onyx-core/          # Core library (backend)
+│   └── onyx-cli/           # CLI frontend
 ├── apps/
 │   └── tauri/                    # Tauri v2 GUI (Svelte 5 + Tailwind CSS 4)
 └── docs/
@@ -30,7 +30,7 @@ bevy-tasks/
 - **Phase 2** (WebDAV Sync): Backend and CLI complete, GUI partially wired
 - **Phase 3** (GUI MVP): In progress — core task CRUD working, UI polished
 
-### Core Library (`bevy-tasks-core`)
+### Core Library (`onyx-core`)
 - Data models (Task, TaskList, AppConfig, WorkspaceConfig)
 - Markdown file I/O with YAML frontmatter
 - Local storage with repository pattern
@@ -39,7 +39,7 @@ bevy-tasks/
 - WebDAV sync with three-way diff and offline queue
 - Platform keychain credential storage
 
-### CLI (`bevy-tasks-cli`)
+### CLI (`onyx-cli`)
 - Workspace management (init, add, list, switch, remove, retarget, migrate)
 - Task list management (create, show, delete)
 - Task operations (add, complete, delete, edit)
@@ -66,15 +66,15 @@ bevy-tasks/
 
 ```bash
 # Clone and build
-git clone https://github.com/SteelDynamite/bevy-tasks.git
-cd bevy-tasks
+git clone https://github.com/SteelDynamite/onyx.git
+cd onyx
 cargo build
 
 # Run tests
-cargo test -p bevy-tasks-core
+cargo test -p onyx-core
 
 # Run CLI
-cargo run -p bevy-tasks-cli -- --help
+cargo run -p onyx-cli -- --help
 
 # Run Tauri GUI
 cd apps/tauri && npm install
@@ -87,7 +87,7 @@ npm run tauri dev
 
 ```bash
 # Initialize a new workspace
-cargo run -p bevy-tasks-cli -- init ~/Documents/Tasks --name personal
+cargo run -p onyx-cli -- init ~/Documents/Tasks --name personal
 
 # This creates:
 # - A workspace named "personal" at ~/Documents/Tasks
@@ -99,51 +99,51 @@ cargo run -p bevy-tasks-cli -- init ~/Documents/Tasks --name personal
 
 ```bash
 # Add a task
-cargo run -p bevy-tasks-cli -- add "Buy groceries"
+cargo run -p onyx-cli -- add "Buy groceries"
 
 # Add a task with due date
-cargo run -p bevy-tasks-cli -- add "Review PR #123" --list "Work" --due "2026-11-15"
+cargo run -p onyx-cli -- add "Review PR #123" --list "Work" --due "2026-11-15"
 
 # List all tasks
-cargo run -p bevy-tasks-cli -- list show
+cargo run -p onyx-cli -- list show
 
 # Complete a task
-cargo run -p bevy-tasks-cli -- complete <task-id>
+cargo run -p onyx-cli -- complete <task-id>
 
 # Edit a task (opens in $EDITOR)
-cargo run -p bevy-tasks-cli -- edit <task-id>
+cargo run -p onyx-cli -- edit <task-id>
 
 # Delete a task
-cargo run -p bevy-tasks-cli -- delete <task-id>
+cargo run -p onyx-cli -- delete <task-id>
 ```
 
 ### Manage workspaces
 
 ```bash
 # Add another workspace
-cargo run -p bevy-tasks-cli -- workspace add shared ~/Dropbox/TeamTasks
+cargo run -p onyx-cli -- workspace add shared ~/Dropbox/TeamTasks
 
 # List workspaces
-cargo run -p bevy-tasks-cli -- workspace list
+cargo run -p onyx-cli -- workspace list
 
 # Switch workspace
-cargo run -p bevy-tasks-cli -- workspace switch shared
+cargo run -p onyx-cli -- workspace switch shared
 
 # Use specific workspace for a command
-cargo run -p bevy-tasks-cli -- add "Team meeting" --workspace shared
+cargo run -p onyx-cli -- add "Team meeting" --workspace shared
 ```
 
 ### Manage task lists
 
 ```bash
 # Create a new list
-cargo run -p bevy-tasks-cli -- list create "Work"
+cargo run -p onyx-cli -- list create "Work"
 
 # Show tasks in a specific list
-cargo run -p bevy-tasks-cli -- list show --list "Work"
+cargo run -p onyx-cli -- list show --list "Work"
 
 # Delete a list
-cargo run -p bevy-tasks-cli -- list delete "Work"
+cargo run -p onyx-cli -- list delete "Work"
 ```
 
 ## Data Format
@@ -190,7 +190,7 @@ Run the test suite:
 cargo test
 
 # Run tests for specific crate
-cargo test -p bevy-tasks-core
+cargo test -p onyx-core
 
 # Run tests with output
 cargo test -- --nocapture

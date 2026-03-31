@@ -1,4 +1,4 @@
-# Bevy Tasks - Project Plan
+# Onyx - Project Plan
 
 ## Vision
 
@@ -41,15 +41,15 @@ A **local-first, cross-platform tasks application** inspired by Google Tasks. Bu
 
 #### Cargo Workspace Structure
 ```
-bevy-tasks/
+onyx/
 ├── Cargo.toml                    # Workspace definition
 ├── PLAN.md
 ├── README.md
 ├── apps/
 │   └── tauri/                    # Tauri GUI (Svelte + Tailwind)
 ├── crates/
-│   ├── bevy-tasks-core/          # Core library (backend)
-│   └── bevy-tasks-cli/           # CLI frontend
+│   ├── onyx-core/          # Core library (backend)
+│   └── onyx-cli/           # CLI frontend
 └── docs/
 ```
 
@@ -162,9 +162,9 @@ WorkspaceConfig {
 - Tasks without due dates appear at the end when grouping is enabled
 
 **App Configuration** (separate from task data, supports multiple workspaces):
-- Windows: `%APPDATA%/bevy-tasks/config.json`
-- Linux: `~/.config/bevy-tasks/config.json`
-- macOS: `~/Library/Application Support/bevy-tasks/config.json`
+- Windows: `%APPDATA%/onyx/config.json`
+- Linux: `~/.config/onyx/config.json`
+- macOS: `~/Library/Application Support/onyx/config.json`
 
 ```json
 {
@@ -226,8 +226,8 @@ pub trait Storage {
 ```toml
 [workspace]
 members = [
-    "crates/bevy-tasks-core",
-    "crates/bevy-tasks-cli",
+    "crates/onyx-core",
+    "crates/onyx-cli",
 ]
 exclude = [
     "apps/tauri/src-tauri",
@@ -242,10 +242,10 @@ anyhow = "1.0"
 tokio = { version = "1.40", features = ["full"] }
 ```
 
-**bevy-tasks-core/Cargo.toml**:
+**onyx-core/Cargo.toml**:
 ```toml
 [package]
-name = "bevy-tasks-core"
+name = "onyx-core"
 version = "0.1.0"
 edition = "2021"
 
@@ -261,19 +261,19 @@ directories = "5.0"
 tempfile = "3.0"
 ```
 
-**bevy-tasks-cli/Cargo.toml**:
+**onyx-cli/Cargo.toml**:
 ```toml
 [package]
-name = "bevy-tasks-cli"
+name = "onyx-cli"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "bevy-tasks"
+name = "onyx"
 path = "src/main.rs"
 
 [dependencies]
-bevy-tasks-core = { path = "../bevy-tasks-core" }
+onyx-core = { path = "../onyx-core" }
 clap = { version = "4.5", features = ["derive", "env"] }
 colored = "2.0"
 anyhow = { workspace = true }
@@ -310,46 +310,46 @@ fs_extra = "1.3"
 
 ```bash
 # First run: initialize a workspace (creates named workspace)
-$ bevy-tasks init ~/Documents/Tasks --name personal
+$ onyx init ~/Documents/Tasks --name personal
 ✓ Initialized workspace "personal" at ~/Documents/Tasks
 ✓ Created default list "My Tasks"
 ✓ Set "personal" as current workspace
 
 # Add more workspaces (e.g., for shared/collaborative tasks)
-$ bevy-tasks workspace add shared ~/Dropbox/TeamTasks
+$ onyx workspace add shared ~/Dropbox/TeamTasks
 ✓ Added workspace "shared" at ~/Dropbox/TeamTasks
 ✓ Created default list "My Tasks"
 
 # List all workspaces
-$ bevy-tasks workspace list
+$ onyx workspace list
   personal: ~/Documents/Tasks (current)
   shared: ~/Dropbox/TeamTasks
 
 # Switch between workspaces
-$ bevy-tasks workspace switch shared
+$ onyx workspace switch shared
 ✓ Switched to workspace "shared"
 
 # Create a new task list
-$ bevy-tasks list create "Work"
+$ onyx list create "Work"
 ✓ Created list "Work"
 
-$ bevy-tasks list create "Personal Projects"
+$ onyx list create "Personal Projects"
 ✓ Created list "Personal Projects"
 
 # Add tasks (uses current workspace by default)
-$ bevy-tasks add "Buy groceries"
+$ onyx add "Buy groceries"
 ✓ Created task "Buy groceries" (550e8400-e29b-41d4-a716-446655440000)
 
-$ bevy-tasks add "Review PR #123" --list "Work" --due "2026-11-15"
+$ onyx add "Review PR #123" --list "Work" --due "2026-11-15"
 ✓ Created task "Review PR #123" (7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c)
   Due: 2026-11-15
 
 # Or specify workspace explicitly
-$ bevy-tasks add "Team meeting" --workspace shared
+$ onyx add "Team meeting" --workspace shared
 ✓ Created task "Team meeting" in workspace "shared"
 
 # List all tasks (from current workspace)
-$ bevy-tasks list show
+$ onyx list show
 My Tasks (3 tasks)
   [ ] Buy groceries
   [ ] Call dentist
@@ -360,37 +360,37 @@ Work (2 tasks)
   [ ] Team meeting prep
 
 # List tasks from specific workspace
-$ bevy-tasks list show --workspace shared
+$ onyx list show --workspace shared
 Shared Tasks (2 tasks)
   [ ] Team meeting
   [ ] Quarterly planning
 
 # List tasks in specific list
-$ bevy-tasks list show --list "Work"
+$ onyx list show --list "Work"
 Work (2 tasks)
   [ ] Review PR #123 (due: 2026-11-15)
   [ ] Team meeting prep
 
 # Complete a task
-$ bevy-tasks complete 550e8400-e29b-41d4-a716-446655440000
+$ onyx complete 550e8400-e29b-41d4-a716-446655440000
 ✓ Completed task "Buy groceries"
 
 # Edit a task (CLI-only: creates temp file, opens $EDITOR, blocks until editor exits, then parses)
-$ bevy-tasks edit 7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c
+$ onyx edit 7f3a9c21-b8d2-4e5f-9a1c-3d8e7f6a2b1c
 # Opens editor with task markdown file
 # User edits and saves, then exits editor
 ✓ Updated task "Review PR #123"
 
 # Delete a task
-$ bevy-tasks delete 550e8400-e29b-41d4-a716-446655440000
+$ onyx delete 550e8400-e29b-41d4-a716-446655440000
 ✓ Deleted task "Buy groceries"
 
 # Retarget workspace (files already at new location, just update config)
-$ bevy-tasks workspace retarget personal ~/new/path/to/Tasks
+$ onyx workspace retarget personal ~/new/path/to/Tasks
 ✓ Workspace "personal" now points to ~/new/path/to/Tasks
 
 # Migrate workspace (move files to new location)
-$ bevy-tasks workspace migrate personal ~/Dropbox/Tasks
+$ onyx workspace migrate personal ~/Dropbox/Tasks
 ⚠ This will move all files from ~/Documents/Tasks to ~/Dropbox/Tasks
 Continue? (y/n): y
 Moving files...
@@ -401,22 +401,22 @@ Moving files...
 ✓ Workspace "personal" now points to ~/Dropbox/Tasks
 
 # Remove a workspace
-$ bevy-tasks workspace remove shared
+$ onyx workspace remove shared
 ⚠ Warning: This will delete workspace config (files remain on disk)
 Continue? (y/n): y
 ✓ Removed workspace "shared"
 
 # Toggle grouping by due date (tasks always use manual task_order within groups)
-$ bevy-tasks group enable --list "Work"
+$ onyx group enable --list "Work"
 ✓ Enabled group-by-due-date for list "Work"
 
-$ bevy-tasks group disable --list "Personal"
+$ onyx group disable --list "Personal"
 ✓ Disabled group-by-due-date for list "Personal"
 ```
 
 ### Deliverables
 
-- [x] `bevy-tasks-core` library with stable API
+- [x] `onyx-core` library with stable API
 - [x] Functional CLI that can manage tasks
 - [x] Data persists as Obsidian-compatible .md files
 - [x] Well-tested backend (>80% coverage)
@@ -427,17 +427,17 @@ $ bevy-tasks group disable --list "Personal"
 ```bash
 # Clone and build
 git clone <repository-url>
-cd bevy-tasks
+cd onyx
 cargo build
 
 # Run tests
-cargo test -p bevy-tasks-core
+cargo test -p onyx-core
 
 # Run CLI
-cargo run -p bevy-tasks-cli -- init ~/test-tasks --name test
-cargo run -p bevy-tasks-cli -- add "Test task"
-cargo run -p bevy-tasks-cli -- list
-cargo run -p bevy-tasks-cli -- workspace list
+cargo run -p onyx-cli -- init ~/test-tasks --name test
+cargo run -p onyx-cli -- add "Test task"
+cargo run -p onyx-cli -- list
+cargo run -p onyx-cli -- workspace list
 ```
 
 ---
@@ -450,7 +450,7 @@ cargo run -p bevy-tasks-cli -- workspace list
 
 #### WebDAV Integration
 
-Add WebDAV support to `bevy-tasks-core`:
+Add WebDAV support to `onyx-core`:
 
 ```rust
 // Update WorkspaceConfig to include WebDAV
@@ -466,7 +466,7 @@ AppConfig {
     current_workspace: Option<String>,
 }
 
-// Sync functions in bevy_tasks_core::sync module (standalone, not on TaskRepository)
+// Sync functions in onyx_core::sync module (standalone, not on TaskRepository)
 pub async fn sync_workspace(
     workspace_path: &Path,
     webdav_url: &str,
@@ -477,7 +477,7 @@ pub async fn sync_workspace(
 
 pub fn get_sync_status(workspace_path: &Path) -> Result<SyncStatusInfo>;
 
-// Credential functions in bevy_tasks_core::webdav module
+// Credential functions in onyx_core::webdav module
 pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result<()>;
 pub fn load_credentials(domain: &str) -> Result<(String, String)>;
 pub fn delete_credentials(domain: &str) -> Result<()>;
@@ -492,14 +492,14 @@ pub fn delete_credentials(domain: &str) -> Result<()>;
 
 **Primary**: Platform Keychain via `keyring` crate
 - Store WebDAV username + password in system keychain
-- Key format: `com.bevy-tasks.webdav.{server-domain}`
+- Key format: `com.onyx.webdav.{server-domain}`
 - Works on: Windows (Credential Manager), macOS (Keychain), Linux (Secret Service), iOS/Android (Keystore)
 
 **Fallback**: Encrypted local storage if keychain unavailable
 
 ### Dependencies
 
-Add to `bevy-tasks-core/Cargo.toml`:
+Add to `onyx-core/Cargo.toml`:
 ```toml
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 keyring = "3.0"
@@ -523,7 +523,7 @@ keyring = "3.0"
 
 ```bash
 # Setup WebDAV for current workspace
-$ bevy-tasks sync --setup
+$ onyx sync --setup
 WebDAV URL: https://nextcloud.example.com/remote.php/dav/files/username/Tasks
 Username: myuser
 Password: ********
@@ -531,7 +531,7 @@ Password: ********
 ✓ Connection verified for workspace "personal"
 
 # Setup WebDAV for specific workspace
-$ bevy-tasks sync --setup --workspace shared
+$ onyx sync --setup --workspace shared
 WebDAV URL: https://nextcloud.example.com/remote.php/dav/files/username/SharedTasks
 Username: myuser
 Password: ********
@@ -539,7 +539,7 @@ Password: ********
 ✓ Connection verified for workspace "shared"
 
 # Push local changes to WebDAV server (current workspace)
-$ bevy-tasks sync --push
+$ onyx sync --push
 Syncing workspace "personal" to https://nextcloud.example.com/...
   Uploading My Tasks/.listdata.json
   Uploading My Tasks/Buy groceries.md
@@ -547,14 +547,14 @@ Syncing workspace "personal" to https://nextcloud.example.com/...
 ✓ Pushed 3 files to WebDAV server
 
 # Pull changes from WebDAV server
-$ bevy-tasks sync --pull
+$ onyx sync --pull
 Syncing workspace "personal" from https://nextcloud.example.com/...
   Downloading Work/Team meeting notes.md
   Downloading Personal/Call mom.md
 ✓ Pulled 2 files from WebDAV server
 
 # Automatic two-way sync
-$ bevy-tasks sync
+$ onyx sync
 Syncing workspace "personal" with https://nextcloud.example.com/...
   ↑ Uploading My Tasks/New task.md
   ↓ Downloading Work/Updated task.md
@@ -562,12 +562,12 @@ Syncing workspace "personal" with https://nextcloud.example.com/...
 ✓ Sync complete
 
 # Sync specific workspace
-$ bevy-tasks sync --workspace shared
+$ onyx sync --workspace shared
 Syncing workspace "shared" with https://nextcloud.example.com/...
 ✓ Sync complete (no changes)
 
 # Check sync status for current workspace
-$ bevy-tasks sync --status
+$ onyx sync --status
 Workspace: personal
 WebDAV Server: https://nextcloud.example.com/remote.php/dav/files/username/Tasks
 Status: Connected
@@ -576,7 +576,7 @@ Local changes: 2 files modified
 Remote changes: 0 files modified
 
 # Check sync status for all workspaces
-$ bevy-tasks sync --status --all
+$ onyx sync --status --all
 Workspace: personal
   WebDAV: https://nextcloud.example.com/.../Tasks
   Status: Connected
@@ -608,7 +608,7 @@ Workspace: shared
 **Decision**: Use Tauri v2 with Svelte and Tailwind for the GUI
 
 **Why Tauri?**
-- Native Rust backend — direct integration with `bevy-tasks-core`
+- Native Rust backend — direct integration with `onyx-core`
 - Svelte 5 for reactive, performant UI with minimal boilerplate
 - Tailwind CSS 4 for rapid, consistent styling
 - Small binary size (~5-10MB)
@@ -715,11 +715,11 @@ WorkspaceConfig {
 - [x] Settings popup overlay (WebDAV config, dark mode toggle)
 - [x] Dark mode (GNOME-style neutral theme, cyan-blue accent)
 - [x] Animated completed section show/hide
-- [ ] Move task between lists (needs `move_task(from_list, to_list, task_id)` added to bevy-tasks-core + Tauri command, then wire into task detail kebab menu)
+- [ ] Move task between lists (needs `move_task(from_list, to_list, task_id)` added to onyx-core + Tauri command, then wire into task detail kebab menu)
 - [ ] Optional time on due dates (backend `due_date` is `DateTime<Utc>` — needs a separate `due_time` field or a nullable time component so date-only tasks don't default to midnight; currently the GUI uses `hours == 0 && minutes == 0` as a heuristic for "no time set" which breaks for actual midnight times)
 - [ ] Due date picker/editor (backend supports it, needs date input in new task toast + inline editing)
 - [ ] WebDAV setup flow with credentials (settings panel has fields, triggerSync needs to pull creds from config)
-- [ ] List/workspace rename (needs `rename_list` added to bevy-tasks-core first)
+- [ ] List/workspace rename (needs `rename_list` added to onyx-core first)
 - [ ] Keyboard shortcuts (Escape to close drawers/menus, tab navigation, Enter behaviors)
 - [ ] Sync status indicators (per workspace)
 - [ ] Push/pull sync mode selection
@@ -765,7 +765,7 @@ Tauri v2 supports iOS and Android natively. The same Svelte frontend and Rust ba
 
 **iOS**:
 - Tauri generates Xcode project
-- Bundle identifier: `com.bevytasks.app`
+- Bundle identifier: `com.onyx.app`
 - Target: `aarch64-apple-ios`
 
 **Android**:
@@ -952,7 +952,7 @@ If you want game-like polish after Phase 7:
 - Migrate GUI from Tauri/Svelte to Bevy
 - Full control over animations and rendering
 - Unique, polished look beyond standard apps
-- Backend (`bevy-tasks-core`) stays identical
+- Backend (`onyx-core`) stays identical
 - Only rewrite the GUI layer
 
 ### Deliverables
