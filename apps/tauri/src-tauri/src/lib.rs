@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 
+use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Emitter, Manager, State};
 use uuid::Uuid;
 
 use onyx_core::{
@@ -12,6 +14,13 @@ use onyx_core::{
     sync::{self, SyncMode, SyncResult as CoreSyncResult},
     webdav,
 };
+
+/// Active file watcher stored globally so it lives for the app lifetime.
+static WATCHER: Mutex<Option<notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>>> =
+    Mutex::new(None);
+
+/// Shared mute timestamp — set before writes, checked by the watcher.
+static LAST_WRITE: Mutex<Option<Instant>> = Mutex::new(None);
 
 /// Shared application state behind a mutex.
 struct AppState {
@@ -41,6 +50,11 @@ impl From<CoreSyncResult> for SyncResult {
             errors: r.errors,
         }
     }
+}
+
+/// Suppress file watcher events for the next second (call before writes).
+fn mute_watcher(_state: &mut AppState) {
+    *LAST_WRITE.lock().unwrap() = Some(Instant::now());
 }
 
 /// Helper: get or open a TaskRepository for the current workspace.
@@ -151,6 +165,7 @@ fn create_list(
 ) -> Result<TaskList, String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
     s.repo
         .as_mut()
         .unwrap()
@@ -165,6 +180,7 @@ fn delete_list(
 ) -> Result<(), String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     s.repo
         .as_mut()
@@ -199,6 +215,7 @@ fn create_task(
 ) -> Result<Task, String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let mut task = Task::new(title);
     if let Some(desc) = description.filter(|d| !d.is_empty()) {
@@ -219,6 +236,7 @@ fn update_task(
 ) -> Result<(), String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     s.repo
         .as_mut()
@@ -235,6 +253,7 @@ fn delete_task(
 ) -> Result<(), String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
     s.repo
@@ -252,6 +271,7 @@ fn toggle_task(
 ) -> Result<Task, String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
     let repo = s.repo.as_mut().unwrap();
@@ -274,12 +294,84 @@ fn reorder_task(
 ) -> Result<(), String> {
     let mut s = state.lock().unwrap();
     ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
     s.repo
         .as_mut()
         .unwrap()
         .reorder_task(lid, tid, new_position)
+        .map_err(|e| e.to_string())
+}
+
+// ── Move / rename / grouping ────────────────────────────────────────
+
+#[tauri::command]
+fn move_task(
+    from_list_id: String,
+    to_list_id: String,
+    task_id: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), String> {
+    let mut s = state.lock().unwrap();
+    ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
+    let from = Uuid::parse_str(&from_list_id).map_err(|e| e.to_string())?;
+    let to = Uuid::parse_str(&to_list_id).map_err(|e| e.to_string())?;
+    let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
+    s.repo
+        .as_mut()
+        .unwrap()
+        .move_task(from, to, tid)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn rename_list(
+    list_id: String,
+    new_name: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), String> {
+    let mut s = state.lock().unwrap();
+    ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
+    let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
+    s.repo
+        .as_mut()
+        .unwrap()
+        .rename_list(id, new_name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_group_by_due_date(
+    list_id: String,
+    enabled: bool,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), String> {
+    let mut s = state.lock().unwrap();
+    ensure_repo(&mut s)?;
+    mute_watcher(&mut s);
+    let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
+    s.repo
+        .as_mut()
+        .unwrap()
+        .set_group_by_due_date(id, enabled)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_group_by_due_date(
+    list_id: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<bool, String> {
+    let mut s = state.lock().unwrap();
+    ensure_repo(&mut s)?;
+    let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
+    s.repo
+        .as_ref()
+        .unwrap()
+        .get_group_by_due_date(id)
         .map_err(|e| e.to_string())
 }
 
@@ -348,6 +440,43 @@ async fn sync_workspace(
     Ok(result.into())
 }
 
+// ── File watcher ────────────────────────────────────────────────────
+
+fn start_watcher(handle: tauri::AppHandle, path: PathBuf) {
+    let handle = handle.clone();
+    let debouncer = new_debouncer(
+        std::time::Duration::from_millis(500),
+        move |events: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| {
+            let Ok(events) = events else { return };
+            // Only care about data file changes
+            let has_data_change = events.iter().any(|e| {
+                if e.kind != DebouncedEventKind::Any { return false; }
+                let p = e.path.to_string_lossy();
+                p.ends_with(".md") || p.ends_with(".json")
+            });
+            if !has_data_change { return; }
+            // Skip if we wrote recently (self-change suppression)
+            if let Some(t) = *LAST_WRITE.lock().unwrap() {
+                if t.elapsed() < std::time::Duration::from_secs(1) { return; }
+            }
+            let _ = handle.emit("fs-changed", ());
+        },
+    );
+    match debouncer {
+        Ok(mut d) => {
+            let _ = d.watcher().watch(&path, notify::RecursiveMode::Recursive);
+            *WATCHER.lock().unwrap() = Some(d);
+        }
+        Err(e) => eprintln!("Failed to start file watcher: {e}"),
+    }
+}
+
+#[tauri::command]
+fn watch_workspace(path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    start_watcher(app_handle, PathBuf::from(path));
+    Ok(())
+}
+
 // ── App entry ────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -360,6 +489,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
         .manage(Mutex::new(AppState { config, repo: None }))
+        .setup(|app| {
+            let handle = app.handle().clone();
+            let state: State<'_, Mutex<AppState>> = app.state();
+            let workspace_path = {
+                let s = state.lock().unwrap();
+                s.config.get_current_workspace().ok().map(|(_, ws)| ws.path.clone())
+            };
+            if let Some(path) = workspace_path {
+                start_watcher(handle, path);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
@@ -376,11 +517,16 @@ pub fn run() {
             delete_task,
             toggle_task,
             reorder_task,
+            move_task,
+            rename_list,
+            set_group_by_due_date,
+            get_group_by_due_date,
             set_webdav_config,
             store_credentials,
             load_credentials,
             test_webdav_connection,
             sync_workspace,
+            watch_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

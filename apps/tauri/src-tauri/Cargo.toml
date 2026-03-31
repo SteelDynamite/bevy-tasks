@@ -23,6 +23,8 @@ onyx-core = { path = "../../../crates/onyx-core" }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+notify = "7"
+notify-debouncer-mini = "0.5"
 
 [package.metadata.tauri]
 
