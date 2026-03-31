@@ -32,6 +32,7 @@ Two-crate workspace (`resolver = "2"`, edition 2021) plus a Tauri app:
 - **onyx-core** — Pure Rust library. Storage trait with `FileSystemStorage` implementation, `TaskRepository` (main API), data models, config, error types. No CLI/UI dependencies.
 - **onyx-cli** — CLI frontend using clap. Commands are in `src/commands/` (init, workspace, list, task, group). Output formatting in `src/output.rs`.
 - **apps/tauri/** — Tauri v2 GUI. Svelte 5 frontend in `src/`, Rust backend in `src-tauri/` with Tauri commands that call into `onyx-core`.
+- **apps/flutter/** — Flutter GUI. Dart frontend in `lib/src/`, Rust backend in `rust/` via flutter_rust_bridge FFI into `onyx-core`.
 
 ### Key patterns
 
@@ -55,11 +56,11 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - **Kebab menus**: Tasks, lists, and workspaces all use kebab → submenu pattern for delete.
 - **New task**: FAB button opens bottom toast sheet (outside sliding container for fixed positioning).
 
-### Current state (2026-03-30)
+### Current state (2026-03-31)
 
 - **Phase 1** (Core + CLI): Complete
-- **Phase 2** (WebDAV sync): Backend done, CLI done, GUI partially wired (empty credentials issue)
-- **Phase 3** (GUI MVP): In progress — core task CRUD working, UI polished with animations
+- **Phase 2** (WebDAV sync): Backend done, CLI done, GUI wired (settings auto-populates credentials)
+- **Phase 3** (GUI MVP): Near complete — core features working, both Tauri and Flutter GUIs maintained
 
 ### GUI features done
 
@@ -72,17 +73,23 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Workspace switcher drop-up with add/remove
 - Dark mode (GNOME-style neutral grays, cyan-blue accent)
 - Completed tasks section with animated show/hide
+- Due date picker/editor (DateTimePicker in new task + task detail)
+- Move task between lists (kebab menu → "Move to..." submenu)
+- List rename (inline input via list kebab menu)
+- Group-by-due-date toggle per list (list kebab menu)
+- Keyboard shortcuts (Escape priority chain: settings → detail → drawer → menus)
+- WebDAV setup flow (settings auto-populates URL/credentials from config + keychain)
+- File watcher (notify crate, 500ms debounce, auto-reloads on external changes)
+- Setup screen with window dragging + "Open Existing Folder" option
 
-### GUI features NOT yet done (CLI has these)
+### GUI features NOT yet done
 
-- Due date editing (model supports it, not exposed in UI)
-- WebDAV setup flow (GUI passes empty credentials)
 - Push-only / pull-only sync modes
-- Sync status view
+- Sync status view/indicators
 - Workspace retarget/migrate
-- Group-by-due-date toggle
 - Subtask hierarchy (data model exists, not used anywhere)
-- List/workspace rename
+- Search/filter tasks
+- Desktop packaging (Windows, Linux, macOS)
 
 ## Roadmap
 

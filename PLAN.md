@@ -715,18 +715,19 @@ WorkspaceConfig {
 - [x] Settings popup overlay (WebDAV config, dark mode toggle)
 - [x] Dark mode (GNOME-style neutral theme, cyan-blue accent)
 - [x] Animated completed section show/hide
-- [ ] Move task between lists (needs `move_task(from_list, to_list, task_id)` added to onyx-core + Tauri command, then wire into task detail kebab menu)
+- [x] Move task between lists (kebab menu → "Move to..." submenu in task detail view)
 - [ ] Optional time on due dates (backend `due_date` is `DateTime<Utc>` — needs a separate `due_time` field or a nullable time component so date-only tasks don't default to midnight; currently the GUI uses `hours == 0 && minutes == 0` as a heuristic for "no time set" which breaks for actual midnight times)
-- [ ] Due date picker/editor (backend supports it, needs date input in new task toast + inline editing)
-- [ ] WebDAV setup flow with credentials (settings panel has fields, triggerSync needs to pull creds from config)
-- [ ] List/workspace rename (needs `rename_list` added to onyx-core first)
-- [ ] Keyboard shortcuts (Escape to close drawers/menus, tab navigation, Enter behaviors)
+- [x] Due date picker/editor (DateTimePicker component in both new task toast + task detail view)
+- [x] WebDAV setup flow with credentials (settings auto-populates URL/username/password from config + keychain on open)
+- [x] List rename (inline input via list kebab menu in drawer)
+- [x] Keyboard shortcuts (Escape closes settings → detail → drawer → menus in priority order)
 - [ ] Sync status indicators (per workspace)
 - [ ] Push/pull sync mode selection
-- [ ] Group-by-due-date toggle per list
+- [x] Group-by-due-date toggle per list (checkmark toggle in list kebab menu)
 - [ ] Subtask hierarchy (data model exists, needs UI)
 - [ ] Search/filter tasks
 - [ ] Desktop packaging (Windows, Linux, macOS)
+- [x] File watcher (notify crate, 500ms debounce, auto-reloads UI on external file changes)
 
 ### Deliverables
 
