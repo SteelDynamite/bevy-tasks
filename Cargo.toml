@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "crates/bevy-tasks-core",
-    "crates/bevy-tasks-cli",
+    "crates/onyx-core",
+    "crates/onyx-cli",
 ]
 exclude = [
     "apps/tauri/src-tauri",

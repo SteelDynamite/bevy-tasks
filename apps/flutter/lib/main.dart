@@ -32,19 +32,19 @@ Future<void> main() async {
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppState()..loadConfig(),
-      child: const BevyTasksApp(),
+      child: const OnyxApp(),
     ),
   );
 }
 
-class BevyTasksApp extends StatelessWidget {
-  const BevyTasksApp({super.key});
+class OnyxApp extends StatelessWidget {
+  const OnyxApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     return MaterialApp(
-      title: 'Bevy Tasks',
+      title: 'Onyx',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

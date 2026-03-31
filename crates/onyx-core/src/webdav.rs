@@ -381,7 +381,7 @@ fn extract_relative_path(href: &str, base_url: &str, request_path: &str) -> Stri
 
 /// Store WebDAV credentials in the platform keychain.
 pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result<()> {
-    let service = format!("com.bevy-tasks.webdav.{}", domain);
+    let service = format!("com.onyx.webdav.{}", domain);
 
     let user_entry = keyring::Entry::new(&service, "username")
         .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
@@ -398,7 +398,7 @@ pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result
 
 /// Load WebDAV credentials from the platform keychain, falling back to env vars.
 pub fn load_credentials(domain: &str) -> Result<(String, String)> {
-    let service = format!("com.bevy-tasks.webdav.{}", domain);
+    let service = format!("com.onyx.webdav.{}", domain);
 
     let user_entry = keyring::Entry::new(&service, "username")
         .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
@@ -411,21 +411,21 @@ pub fn load_credentials(domain: &str) -> Result<(String, String)> {
 
     // Fallback to env vars for headless/CI environments
     if let (Ok(user), Ok(pass)) = (
-        std::env::var("BEVY_TASKS_WEBDAV_USER"),
-        std::env::var("BEVY_TASKS_WEBDAV_PASS"),
+        std::env::var("ONYX_WEBDAV_USER"),
+        std::env::var("ONYX_WEBDAV_PASS"),
     ) {
         return Ok((user, pass));
     }
 
     Err(Error::Credential(format!(
-        "No credentials found for '{}'. Run 'bevy-tasks sync --setup' or set BEVY_TASKS_WEBDAV_USER and BEVY_TASKS_WEBDAV_PASS.",
+        "No credentials found for '{}'. Run 'onyx sync --setup' or set ONYX_WEBDAV_USER and ONYX_WEBDAV_PASS.",
         domain
     )))
 }
 
 /// Delete WebDAV credentials from the platform keychain.
 pub fn delete_credentials(domain: &str) -> Result<()> {
-    let service = format!("com.bevy-tasks.webdav.{}", domain);
+    let service = format!("com.onyx.webdav.{}", domain);
 
     if let Ok(entry) = keyring::Entry::new(&service, "username") {
         let _ = entry.delete_credential();

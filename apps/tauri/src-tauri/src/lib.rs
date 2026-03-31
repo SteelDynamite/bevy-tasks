@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use uuid::Uuid;
 
-use bevy_tasks_core::{
+use onyx_core::{
     config::{AppConfig, WorkspaceConfig},
     models::{Task, TaskList, TaskStatus},
     repository::TaskRepository,
@@ -321,7 +321,7 @@ async fn test_webdav_connection(
     username: String,
     password: String,
 ) -> Result<(), String> {
-    let client = bevy_tasks_core::webdav::WebDavClient::new(&url, &username, &password);
+    let client = onyx_core::webdav::WebDavClient::new(&url, &username, &password);
     client
         .test_connection()
         .await

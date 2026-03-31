@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 
-use bevy_tasks_core::{
+use onyx_core::{
     config::{AppConfig, WorkspaceConfig},
     models::{Task, TaskList, TaskStatus},
     repository::TaskRepository,

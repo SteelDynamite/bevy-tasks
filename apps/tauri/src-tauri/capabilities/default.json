@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Default capabilities for Bevy Tasks",
+  "description": "Default capabilities for Onyx",
   "windows": ["main"],
   "permissions": [
     "core:default",

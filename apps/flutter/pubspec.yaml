@@ -1,5 +1,5 @@
-name: bevy_tasks
-description: "Bevy Tasks - local-first task management"
+name: onyx
+description: "Onyx - local-first task management"
 publish_to: 'none'
 version: 1.0.0+1
 

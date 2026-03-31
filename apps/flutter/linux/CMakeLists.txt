@@ -4,10 +4,10 @@ project(runner LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "bevy_tasks")
+set(BINARY_NAME "onyx")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "com.bevytasks.bevy_tasks")
+set(APPLICATION_ID "com.onyx.onyx")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -59,7 +59,7 @@ add_subdirectory("runner")
 
 # Build the Rust FFI library for flutter_rust_bridge
 set(RUST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../rust")
-set(RUST_LIB_NAME "libbevy_tasks_flutter.so")
+set(RUST_LIB_NAME "libonyx_flutter.so")
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
   set(RUST_TARGET_DIR "${RUST_DIR}/target/debug")
   add_custom_command(

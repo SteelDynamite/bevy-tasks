@@ -27,7 +27,7 @@ static void my_application_activate(GApplication* application) {
 
   // Frameless transparent window
   gtk_window_set_decorated(window, FALSE);
-  gtk_window_set_title(window, "bevy_tasks");
+  gtk_window_set_title(window, "onyx");
   gtk_window_set_default_size(window, 400, 700);
 
   // Enable transparency

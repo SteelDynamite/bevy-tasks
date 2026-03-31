@@ -1,5 +1,5 @@
 [package]
-name = "bevy-tasks-flutter"
+name = "onyx-flutter"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.11.1"
-bevy-tasks-core = { path = "../../../crates/bevy-tasks-core" }
+onyx-core = { path = "../../../crates/onyx-core" }
 uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 once_cell = "1"

@@ -52,7 +52,7 @@ class _SetupScreenState extends State<SetupScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Bevy Tasks',
+              Text('Onyx',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700,
                   color: isDark ? AppTheme.textDark : AppTheme.textLight)),
               const SizedBox(height: 4),
