@@ -15,7 +15,7 @@ class TasksScreen extends StatefulWidget {
   State<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen> {
+class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStateMixin {
   bool _drawerOpen = false;
   bool _showCompleted = false;
   bool _completedVisible = false;
@@ -24,9 +24,22 @@ class _TasksScreenState extends State<TasksScreen> {
   bool _newTaskOpen = false;
   final _newListController = TextEditingController();
   final _newListFocus = FocusNode();
+  late final AnimationController _newTaskAnim;
+  late final Animation<Offset> _newTaskSlide;
+  late final Animation<double> _newTaskFade;
+
+  @override
+  void initState() {
+    super.initState();
+    _newTaskAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 150));
+    _newTaskSlide = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _newTaskAnim, curve: Curves.easeOut));
+    _newTaskFade = CurvedAnimation(parent: _newTaskAnim, curve: Curves.easeOut);
+  }
 
   @override
   void dispose() {
+    _newTaskAnim.dispose();
     _newListController.dispose();
     _newListFocus.dispose();
     super.dispose();
@@ -47,10 +60,13 @@ class _TasksScreenState extends State<TasksScreen> {
     final state = context.read<AppState>();
     if (state.activeListId == null) return;
     setState(() => _newTaskOpen = true);
+    _newTaskAnim.forward();
   }
 
   void _closeNewTask() {
-    setState(() => _newTaskOpen = false);
+    _newTaskAnim.reverse().then((_) {
+      if (mounted) setState(() => _newTaskOpen = false);
+    });
   }
 
   Future<void> _handleCreateTask(String title, String desc, {String? dueDate}) async {
@@ -94,21 +110,29 @@ class _TasksScreenState extends State<TasksScreen> {
         clipBehavior: Clip.hardEdge,
         children: [
           // Sliding container: drawer + main + detail
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            left: _drawerOpen ? 0.0 : -drawerWidth,
-            top: 0,
-            bottom: 0,
-            width: drawerWidth + width,
-            child: Row(
-              children: [
-                SizedBox(width: drawerWidth, child: _buildDrawer(state, isDark)),
-                SizedBox(
-                  width: width,
-                  child: _buildMainWithDetail(state, isDark, width),
+          Positioned.fill(
+            child: ClipRect(
+              child: OverflowBox(
+                maxWidth: drawerWidth + width,
+                alignment: Alignment.centerLeft,
+                child: AnimatedSlide(
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOut,
+                  offset: _drawerOpen ? Offset.zero : Offset(-drawerWidth / (drawerWidth + width), 0),
+                  child: SizedBox(
+                    width: drawerWidth + width,
+                    child: Row(
+                      children: [
+                        SizedBox(width: drawerWidth, child: _buildDrawer(state, isDark)),
+                        SizedBox(
+                          width: width,
+                          child: _buildMainWithDetail(state, isDark, width),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
           // FAB button (centered, 56px, hidden when drawer/detail/newTask open)
@@ -133,13 +157,10 @@ class _TasksScreenState extends State<TasksScreen> {
               ),
             ),
           // New task overlay (animated, inside app bounds)
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: !_newTaskOpen,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                opacity: _newTaskOpen ? 1.0 : 0.0,
+          if (_newTaskOpen || _newTaskAnim.isAnimating)
+            Positioned.fill(
+              child: FadeTransition(
+                opacity: _newTaskFade,
                 child: GestureDetector(
                   onTap: _closeNewTask,
                   child: Container(
@@ -147,15 +168,15 @@ class _TasksScreenState extends State<TasksScreen> {
                     alignment: Alignment.bottomCenter,
                     child: GestureDetector(
                       onTap: () {},
-                      child: _newTaskOpen
-                          ? NewTaskInput(onCreate: _handleCreateTask)
-                          : const SizedBox.shrink(),
+                      child: SlideTransition(
+                        position: _newTaskSlide,
+                        child: NewTaskInput(onCreate: _handleCreateTask),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       );
     });
@@ -170,49 +191,67 @@ class _TasksScreenState extends State<TasksScreen> {
           child: OverflowBox(
             maxWidth: totalWidth * 2,
             alignment: Alignment.centerLeft,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
+            child: AnimatedSlide(
+              duration: const Duration(milliseconds: 150),
               curve: Curves.easeOut,
-              transform: Matrix4.translationValues(hasDetail ? -totalWidth : 0, 0, 0),
-              width: totalWidth * 2,
-              child: Row(
-                children: [
-                  SizedBox(width: totalWidth, child: _buildMain(state, isDark)),
-                  SizedBox(
-                    width: totalWidth,
-                    child: Container(
-                      color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-                      child: hasDetail
-                          ? TaskDetailView(task: state.selectedTask!)
-                          : const SizedBox.shrink(),
+              offset: hasDetail ? const Offset(-0.5, 0) : Offset.zero,
+              child: SizedBox(
+                width: totalWidth * 2,
+                child: Row(
+                  children: [
+                    SizedBox(width: totalWidth, child: _buildMain(state, isDark)),
+                    SizedBox(
+                      width: totalWidth,
+                      child: Container(
+                        color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+                        child: hasDetail
+                            ? TaskDetailView(task: state.selectedTask!)
+                            : const SizedBox.shrink(),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-        // Dim overlay when drawer is open (animated fade)
+        // Drawer shadow (narrow element at left edge casting right)
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 1,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              opacity: _drawerOpen ? 1.0 : 0.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      offset: const Offset(4, 0),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Dim overlay when drawer is open
         Positioned.fill(
           child: IgnorePointer(
             ignoring: !_drawerOpen,
             child: GestureDetector(
               onTap: _closeDrawer,
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 250),
+                duration: const Duration(milliseconds: 150),
                 curve: Curves.easeOut,
                 opacity: _drawerOpen ? 1.0 : 0.0,
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 24,
-                        offset: const Offset(8, 0),
-                      ),
-                    ],
-                  ),
+                  color: Colors.black.withValues(alpha: 0.4),
                 ),
               ),
             ),
@@ -225,137 +264,59 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _buildDrawer(AppState state, bool isDark) {
     return Container(
       color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-      child: Column(
+      child: Stack(
         children: [
-          // Header: workspace switcher (matching Tauri)
-          GestureDetector(
-            onPanStart: (_) {},
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderLight, width: 0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _workspaceSwitcherOpen = !_workspaceSwitcherOpen),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                state.config?.currentWorkspace ?? 'Workspace',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            AnimatedRotation(
-                              turns: _workspaceSwitcherOpen ? 0.5 : 0,
-                              duration: const Duration(milliseconds: 200),
-                              child: Icon(Icons.expand_more, size: 14,
-                                color: isDark ? AppTheme.textDark : AppTheme.textLight),
-                            ),
-                          ],
-                        ),
-                      ),
+          Column(
+            children: [
+              // Header: workspace switcher
+              GestureDetector(
+                onPanStart: (_) {},
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderLight, width: 0.5),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          // Workspace dropdown (appears below header)
-          if (_workspaceSwitcherOpen && state.config != null)
-            Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-                border: Border(
-                  bottom: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderLight, width: 0.5),
-                ),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2)),
-                ],
-              ),
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                children: [
-                  for (final ws in state.config!.workspaces)
-                    GestureDetector(
-                      onTap: () {
-                        state.switchWorkspace(ws.name);
-                        setState(() => _workspaceSwitcherOpen = false);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            children: [
-                              if (ws.name == state.config?.currentWorkspace)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: Icon(Icons.check, size: 16,
-                                    color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.5)),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _workspaceSwitcherOpen = !_workspaceSwitcherOpen),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    state.config?.currentWorkspace ?? 'Workspace',
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(ws.name,
-                                      style: TextStyle(fontSize: 14,
-                                        fontWeight: ws.name == state.config?.currentWorkspace ? FontWeight.w700 : FontWeight.normal),
-                                      overflow: TextOverflow.ellipsis),
-                                    Text(ws.path,
-                                      style: TextStyle(fontSize: 12,
-                                        color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.4)),
-                                      overflow: TextOverflow.ellipsis),
-                                  ],
+                                const SizedBox(width: 6),
+                                AnimatedRotation(
+                                  turns: _workspaceSwitcherOpen ? 0.5 : 0,
+                                  duration: const Duration(milliseconds: 150),
+                                  child: Icon(Icons.expand_more, size: 14,
+                                    color: isDark ? AppTheme.textDark : AppTheme.textLight),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  // Add workspace
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderLight, width: 0.5)),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() => _workspaceSwitcherOpen = false);
-                        state.setScreen('setup');
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        child: Text('+ Add workspace',
-                          style: TextStyle(fontSize: 14, color: AppTheme.primary)),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          // List items
-          Expanded(
+              // List items
+              Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
@@ -428,22 +389,95 @@ class _TasksScreenState extends State<TasksScreen> {
               ],
             ),
           ),
-          // Footer: Settings button (matching Tauri)
-          GestureDetector(
-            onTap: () => state.setScreen('settings'),
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderLight, width: 0.5)),
+            // Footer: Settings button (matching Tauri)
+            GestureDetector(
+              onTap: () => state.setScreen('settings'),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderLight, width: 0.5)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.settings, size: 18,
+                      color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.5)),
+                    const SizedBox(width: 8),
+                    Text('Settings', style: TextStyle(fontSize: 14,
+                      color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.5))),
+                  ],
+                ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  Icon(Icons.settings, size: 18,
-                    color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.5)),
-                  const SizedBox(width: 8),
-                  Text('Settings', style: TextStyle(fontSize: 14,
-                    color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.5))),
-                ],
+            ),
+          ],
+          ),
+          // Workspace switcher popup backdrop
+          if (_workspaceSwitcherOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => setState(() => _workspaceSwitcherOpen = false),
+                behavior: HitTestBehavior.opaque,
+                child: const SizedBox.expand(),
+              ),
+            ),
+          // Workspace switcher popup menu
+          Positioned(
+            left: 8,
+            right: 8,
+            top: 48,
+            child: AnimatedScale(
+              scale: _workspaceSwitcherOpen ? 1.0 : 0.9,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              alignment: Alignment.topLeft,
+              child: AnimatedOpacity(
+                opacity: _workspaceSwitcherOpen ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.easeOut,
+                child: IgnorePointer(
+                  ignoring: !_workspaceSwitcherOpen,
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDark : AppTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: state.config != null
+                      ? ListView(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          children: [
+                            for (final ws in state.config!.workspaces)
+                              _WorkspaceMenuItem(
+                                name: ws.name,
+                                path: ws.path,
+                                isActive: ws.name == state.config?.currentWorkspace,
+                                onTap: () {
+                                  state.switchWorkspace(ws.name);
+                                  setState(() => _workspaceSwitcherOpen = false);
+                                },
+                              ),
+                            // Add workspace
+                            _WorkspaceMenuItem(
+                              icon: null,
+                              name: '+ Add workspace',
+                              path: null,
+                              isActive: false,
+                              isAccent: true,
+                              showDivider: true,
+                              onTap: () {
+                                setState(() => _workspaceSwitcherOpen = false);
+                                state.setScreen('setup');
+                              },
+                            ),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                  ),
+                ),
               ),
             ),
           ),
@@ -549,7 +583,7 @@ class _TasksScreenState extends State<TasksScreen> {
             setState(() {
               if (_showCompleted) {
                 _showCompleted = false;
-                Future.delayed(const Duration(milliseconds: 300), () {
+                Future.delayed(const Duration(milliseconds: 150), () {
                   if (mounted) setState(() => _completedVisible = false);
                 });
               } else {
@@ -580,7 +614,7 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
                 AnimatedRotation(
                   turns: _showCompleted ? 0.25 : 0,
-                  duration: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 150),
                   child: Icon(Icons.chevron_right, size: 16,
                     color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight),
                 ),
@@ -590,10 +624,10 @@ class _TasksScreenState extends State<TasksScreen> {
         ),
         if (_completedVisible)
           AnimatedOpacity(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 150),
             opacity: _showCompleted ? 1.0 : 0.0,
             child: AnimatedSlide(
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 150),
               offset: _showCompleted ? Offset.zero : const Offset(0, -0.05),
               child: Column(
                 children: [
@@ -678,6 +712,87 @@ class _ListTileState extends State<_ListTile> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _WorkspaceMenuItem extends StatefulWidget {
+  final String name;
+  final String? path;
+  final bool isActive;
+  final bool isAccent;
+  final bool showDivider;
+  final IconData? icon;
+  final VoidCallback onTap;
+
+  const _WorkspaceMenuItem({
+    required this.name,
+    this.path,
+    required this.isActive,
+    this.isAccent = false,
+    this.showDivider = false,
+    this.icon,
+    required this.onTap,
+  });
+
+  @override
+  State<_WorkspaceMenuItem> createState() => _WorkspaceMenuItemState();
+}
+
+class _WorkspaceMenuItemState extends State<_WorkspaceMenuItem> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.showDivider)
+          Divider(height: 1, thickness: 0.5, color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
+        MouseRegion(
+          onEnter: (_) => setState(() => _hovering = true),
+          onExit: (_) => setState(() => _hovering = false),
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: Container(
+              color: _hovering
+                  ? (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05))
+                  : Colors.transparent,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  if (widget.isActive)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Icon(Icons.check, size: 16,
+                        color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.5)),
+                    ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: widget.isActive ? FontWeight.w700 : FontWeight.normal,
+                            color: widget.isAccent ? AppTheme.primary : null,
+                          ),
+                          overflow: TextOverflow.ellipsis),
+                        if (widget.path != null)
+                          Text(widget.path!,
+                            style: TextStyle(fontSize: 12,
+                              color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.4)),
+                            overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

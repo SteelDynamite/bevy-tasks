@@ -22,7 +22,7 @@ class SettingsScreen extends StatelessWidget {
           onTap: () {},
           child: AnimatedScale(
             scale: 1.0,
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 150),
             curve: Curves.easeOut,
             child: Container(
               decoration: BoxDecoration(
@@ -112,7 +112,7 @@ class SettingsScreen extends StatelessWidget {
                                   const Spacer(),
                                   // Toggle switch (matching Tauri: h-6 w-11)
                                   AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
+                                    duration: const Duration(milliseconds: 150),
                                     width: 44,
                                     height: 24,
                                     decoration: BoxDecoration(
@@ -120,7 +120,7 @@ class SettingsScreen extends StatelessWidget {
                                       color: state.darkMode ? AppTheme.primary : (isDark ? const Color(0xFF4B5563) : const Color(0xFFD1D5DB)),
                                     ),
                                     child: AnimatedAlign(
-                                      duration: const Duration(milliseconds: 200),
+                                      duration: const Duration(milliseconds: 150),
                                       alignment: state.darkMode ? Alignment.centerRight : Alignment.centerLeft,
                                       child: Container(
                                         width: 20,

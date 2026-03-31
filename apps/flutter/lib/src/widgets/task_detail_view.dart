@@ -16,17 +16,24 @@ class TaskDetailView extends StatefulWidget {
   State<TaskDetailView> createState() => _TaskDetailViewState();
 }
 
-class _TaskDetailViewState extends State<TaskDetailView> {
+class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProviderStateMixin {
   late TextEditingController _titleController;
   late TextEditingController _descController;
   Timer? _debounce;
   bool _showMenu = false;
+  late final AnimationController _menuAnim;
+  late final Animation<double> _menuFade;
+  late final Animation<double> _menuScale;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.task.title);
     _descController = TextEditingController(text: widget.task.description);
+    _menuAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 150));
+    _menuFade = CurvedAnimation(parent: _menuAnim, curve: Curves.easeOut);
+    _menuScale = Tween<double>(begin: 0.9, end: 1.0)
+        .animate(CurvedAnimation(parent: _menuAnim, curve: Curves.easeOut));
   }
 
   @override
@@ -42,6 +49,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _menuAnim.dispose();
     _titleController.dispose();
     _descController.dispose();
     super.dispose();
@@ -245,7 +253,11 @@ class _TaskDetailViewState extends State<TaskDetailView> {
               if (_showMenu)
                 Positioned.fill(
                   child: GestureDetector(
-                    onTap: () => setState(() => _showMenu = false),
+                    onTap: () {
+                      _menuAnim.reverse().then((_) {
+                        if (mounted) setState(() => _showMenu = false);
+                      });
+                    },
                     behavior: HitTestBehavior.opaque,
                     child: const SizedBox.expand(),
                   ),
@@ -259,52 +271,68 @@ class _TaskDetailViewState extends State<TaskDetailView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     GestureDetector(
-                      onTap: () => setState(() => _showMenu = !_showMenu),
+                      onTap: () {
+                        setState(() => _showMenu = !_showMenu);
+                        if (_showMenu) _menuAnim.forward(); else _menuAnim.reverse();
+                      },
                       child: Padding(
                         padding: const EdgeInsets.all(6),
                         child: Icon(Icons.more_vert, size: 20,
                           color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.5)),
                       ),
                     ),
-                    if (_showMenu)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        constraints: const BoxConstraints(minWidth: 200),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2)),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _KebabMenuItem(
-                                icon: isCompleted ? Icons.close : Icons.check,
-                                label: isCompleted ? 'Restore task' : 'Mark as completed',
-                                onTap: () {
-                                  setState(() => _showMenu = false);
-                                  state.toggleTask(widget.task.id);
-                                  state.selectTask(null);
-                                },
+                    ScaleTransition(
+                      scale: _menuScale,
+                      alignment: Alignment.topRight,
+                      child: FadeTransition(
+                        opacity: _menuFade,
+                        child: IgnorePointer(
+                          ignoring: !_showMenu,
+                          child: Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            width: 200,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2)),
+                              ],
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+                                borderRadius: BorderRadius.circular(7),
                               ),
-                              _KebabMenuItem(
-                                icon: Icons.delete_outline,
-                                label: 'Delete',
-                                color: AppTheme.danger,
-                                onTap: () {
-                                  setState(() => _showMenu = false);
-                                  state.deleteTask(widget.task.id);
-                                },
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _KebabMenuItem(
+                                    icon: isCompleted ? Icons.close : Icons.check,
+                                    label: isCompleted ? 'Restore task' : 'Mark as completed',
+                                    onTap: () {
+                                      setState(() => _showMenu = false);
+                                      state.toggleTask(widget.task.id);
+                                      state.selectTask(null);
+                                    },
+                                  ),
+                                  _KebabMenuItem(
+                                    icon: Icons.delete_outline,
+                                    label: 'Delete',
+                                    color: AppTheme.danger,
+                                    onTap: () {
+                                      setState(() => _showMenu = false);
+                                      state.deleteTask(widget.task.id);
+                                    },
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),

@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -53,10 +54,47 @@ class BevyTasksApp extends StatelessWidget {
   }
 }
 
-class AppShell extends StatelessWidget {
+class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin {
   static const _edge = 8.0;
+  late final AnimationController _settingsAnim;
+  late final Animation<double> _settingsFade;
+  late final Animation<double> _settingsScale;
+  bool _settingsVisible = false;
+  String? _prevScreen;
+
+  @override
+  void initState() {
+    super.initState();
+    _settingsAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 150));
+    _settingsFade = CurvedAnimation(parent: _settingsAnim, curve: Curves.easeOut);
+    _settingsScale = Tween<double>(begin: 0.95, end: 1.0)
+        .animate(CurvedAnimation(parent: _settingsAnim, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _settingsAnim.dispose();
+    super.dispose();
+  }
+
+  void _onScreenChanged(String screen) {
+    if (screen == 'settings' && _prevScreen != 'settings') {
+      _settingsVisible = true;
+      _settingsAnim.forward();
+    } else if (screen != 'settings' && _prevScreen == 'settings') {
+      _settingsAnim.reverse().then((_) {
+        if (mounted) setState(() => _settingsVisible = false);
+      });
+    }
+    _prevScreen = screen;
+  }
 
   SystemMouseCursor _cursorFor(ResizeEdge? edge) => switch (edge) {
     ResizeEdge.top || ResizeEdge.bottom => SystemMouseCursors.resizeUpDown,
@@ -70,6 +108,57 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasNativeBorder = Platform.isWindows;
+
+    _onScreenChanged(state.screen);
+
+    Widget content = Stack(
+      children: [
+        if (state.screen == 'setup')
+          const SetupScreen()
+        else
+          const TasksScreen(),
+        if (state.error != null)
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Material(
+              color: AppTheme.danger,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(state.error!, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    ),
+                    GestureDetector(
+                      onTap: state.clearError,
+                      child: const Text('✕', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (_settingsVisible)
+          FadeTransition(
+            opacity: _settingsFade,
+            child: ScaleTransition(
+              scale: _settingsScale,
+              child: const SettingsScreen(),
+            ),
+          ),
+      ],
+    );
+
+    if (hasNativeBorder) {
+      // Windows provides native border + shadow, just fill with surface color
+      return Scaffold(
+        backgroundColor: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+        body: ClipRect(child: content),
+      );
+    }
+
+    // Linux/macOS: custom border, shadow, and resize zones
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: LayoutBuilder(builder: (context, constraints) {
@@ -78,14 +167,10 @@ class AppShell extends StatelessWidget {
           hitTestBehavior: HitTestBehavior.translucent,
           child: Listener(
             behavior: HitTestBehavior.translucent,
-            onPointerHover: (event) {
-              // Update cursor based on edge proximity (handled by nested MouseRegion below)
-            },
+            onPointerHover: (event) {},
             child: Stack(
               children: [
-                // Resize hit zones (in the 8px padding area)
                 ..._buildResizeZones(constraints),
-                // Main content with padding
                 Padding(
                   padding: const EdgeInsets.all(_edge),
                   child: Container(
@@ -101,37 +186,7 @@ class AppShell extends StatelessWidget {
                       ],
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: Stack(
-                      children: [
-                        if (state.screen == 'setup')
-                          const SetupScreen()
-                        else
-                          const TasksScreen(),
-                        if (state.error != null)
-                          Positioned(
-                            top: 0, left: 0, right: 0,
-                            child: Material(
-                              color: AppTheme.danger,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(state.error!, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                                    ),
-                                    GestureDetector(
-                                      onTap: state.clearError,
-                                      child: const Text('✕', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        if (state.screen == 'settings')
-                          const SettingsScreen(),
-                      ],
-                    ),
+                    child: content,
                   ),
                 ),
               ],
