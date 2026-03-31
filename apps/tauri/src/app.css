@@ -24,11 +24,24 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  background: transparent;
+}
+
 body {
   margin: 0;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  background: transparent;
+}
+
+.linux-window-border {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 2px rgba(0, 0, 0, 0.1);
+}
+.dark .linux-window-border {
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Scrollbar styling */
