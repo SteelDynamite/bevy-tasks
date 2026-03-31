@@ -329,6 +329,8 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                       _closeDrawer();
                     },
                     onDelete: () => state.deleteList(list.id),
+                    onRename: (newName) => state.renameList(list.id, newName),
+                    onToggleGroupByDueDate: () => state.setGroupByDueDate(list.id, !list.groupByDueDate),
                   ),
                 // New list button / input
                 Padding(
@@ -651,8 +653,10 @@ class _ListTile extends StatefulWidget {
   final bool isActive;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final void Function(String newName) onRename;
+  final VoidCallback onToggleGroupByDueDate;
 
-  const _ListTile({required this.list, required this.isActive, required this.onTap, required this.onDelete});
+  const _ListTile({required this.list, required this.isActive, required this.onTap, required this.onDelete, required this.onRename, required this.onToggleGroupByDueDate});
 
   @override
   State<_ListTile> createState() => _ListTileState();
@@ -660,6 +664,38 @@ class _ListTile extends StatefulWidget {
 
 class _ListTileState extends State<_ListTile> {
   bool _hovering = false;
+
+  void _showRenameDialog(BuildContext context) {
+    final controller = TextEditingController(text: widget.list.title);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename list'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'List name'),
+          onSubmitted: (value) {
+            Navigator.pop(ctx);
+            if (value.trim().isNotEmpty && value.trim() != widget.list.title) {
+              widget.onRename(value.trim());
+            }
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final name = controller.text.trim();
+              if (name.isNotEmpty && name != widget.list.title) widget.onRename(name);
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -674,6 +710,20 @@ class _ListTileState extends State<_ListTile> {
             context: context,
             position: RelativeRect.fromLTRB(details.globalPosition.dx, details.globalPosition.dy, 0, 0),
             items: [
+              PopupMenuItem(
+                onTap: () => _showRenameDialog(context),
+                child: const Text('Rename', style: TextStyle(fontSize: 13)),
+              ),
+              PopupMenuItem(
+                onTap: widget.onToggleGroupByDueDate,
+                child: Row(
+                  children: [
+                    Expanded(child: Text('Group by due date', style: const TextStyle(fontSize: 13))),
+                    if (widget.list.groupByDueDate)
+                      const Icon(Icons.check, size: 16, color: AppTheme.primary),
+                  ],
+                ),
+              ),
               PopupMenuItem(
                 onTap: widget.onDelete,
                 child: const Text('Delete', style: TextStyle(color: AppTheme.danger, fontSize: 13)),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../rust/api.dart' as api;
 
@@ -8,6 +9,7 @@ class AppState extends ChangeNotifier {
   String? activeListId;
   List<api.TaskDto> tasks = [];
   bool darkMode = true;
+  StreamSubscription? _watcherSub;
   bool syncing = false;
   String? error;
 
@@ -26,12 +28,22 @@ class AppState extends ChangeNotifier {
   api.TaskDto? get selectedTask =>
       selectedTaskId == null ? null : tasks.cast<api.TaskDto?>().firstWhere((t) => t?.id == selectedTaskId, orElse: () => null);
 
+  Future<void> _startWatcher(String path) async {
+    _watcherSub?.cancel();
+    try {
+      final stream = await api.watchWorkspaceChanges(path: path);
+      _watcherSub = stream.listen((_) => loadLists());
+    } catch (_) {}
+  }
+
   Future<void> loadConfig() async {
     try {
       config = await api.getConfig();
       if (hasWorkspace) {
         screen = 'tasks';
         await loadLists();
+        final ws = config!.workspaces.firstWhere((w) => w.name == config!.currentWorkspace);
+        _startWatcher(ws.path);
       } else {
         screen = 'setup';
       }
@@ -48,6 +60,7 @@ class AppState extends ChangeNotifier {
       await api.addWorkspace(name: name, path: path);
       config = await api.getConfig();
       await loadLists();
+      _startWatcher(path);
       screen = 'tasks';
       error = null;
     } catch (e) {
@@ -62,6 +75,8 @@ class AppState extends ChangeNotifier {
       config = await api.getConfig();
       activeListId = null;
       await loadLists();
+      final ws = config!.workspaces.firstWhere((w) => w.name == name);
+      _startWatcher(ws.path);
       error = null;
     } catch (e) {
       error = e.toString();
@@ -193,6 +208,39 @@ class AppState extends ChangeNotifier {
     try {
       await api.reorderTask(listId: activeListId!, taskId: taskId, newPosition: newPosition);
       await loadTasks();
+    } catch (e) {
+      error = e.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> moveTask(String taskId, String targetListId) async {
+    if (activeListId == null) return;
+    try {
+      await api.moveTask(fromListId: activeListId!, toListId: targetListId, taskId: taskId);
+      tasks = tasks.where((t) => t.id != taskId).toList();
+      if (selectedTaskId == taskId) selectedTaskId = null;
+    } catch (e) {
+      error = e.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> renameList(String listId, String newName) async {
+    try {
+      await api.renameList(listId: listId, newName: newName);
+      await loadLists();
+    } catch (e) {
+      error = e.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> setGroupByDueDate(String listId, bool enabled) async {
+    try {
+      await api.setGroupByDueDate(listId: listId, enabled: enabled);
+      await loadLists();
+      if (listId == activeListId) await loadTasks();
     } catch (e) {
       error = e.toString();
     }
