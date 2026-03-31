@@ -9,6 +9,22 @@
   let webdavPass = $state("");
   let testStatus = $state<"idle" | "testing" | "ok" | "fail">("idle");
 
+  $effect(() => {
+    const ws = app.config?.current_workspace;
+    if (!ws) return;
+    const cfg = app.config?.workspaces[ws];
+    if (cfg?.webdav_url) {
+      webdavUrl = cfg.webdav_url;
+      try {
+        const domain = new URL(cfg.webdav_url).hostname;
+        invoke<[string, string]>("load_credentials", { domain }).then(([u, p]) => {
+          webdavUser = u;
+          webdavPass = p;
+        }).catch(() => {});
+      } catch {}
+    }
+  });
+
   async function testConnection() {
     testStatus = "testing";
     try {
