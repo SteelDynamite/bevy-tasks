@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
-        stem: 'bevy_tasks_flutter',
+        stem: 'onyx_flutter',
         ioDirectory: 'rust/target/release/',
         webPrefix: 'pkg/',
       );
