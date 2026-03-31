@@ -88,6 +88,8 @@ pub trait Storage {
     fn read_root_metadata(&self) -> Result<RootMetadata>;
     fn write_root_metadata(&mut self, metadata: &RootMetadata) -> Result<()>;
 
+    fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()>;
+
     fn read_list_metadata(&self, list_id: Uuid) -> Result<ListMetadata>;
     fn write_list_metadata(&mut self, metadata: &ListMetadata) -> Result<()>;
 }
@@ -460,6 +462,27 @@ impl Storage for FileSystemStorage {
             root_metadata.last_opened_list = root_metadata.list_order.first().copied();
         }
         self.write_root_metadata_internal(&root_metadata)?;
+
+        Ok(())
+    }
+
+    fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()> {
+        let old_dir = self.list_dir_path(list_id)?;
+        let new_dir = self.list_dir_path_by_name(&new_name);
+
+        if new_dir.exists() {
+            return Err(Error::InvalidData(format!("A list named '{}' already exists", new_name)));
+        }
+
+        fs::rename(&old_dir, &new_dir)?;
+
+        // Update metadata timestamp
+        let metadata_path = new_dir.join(".listdata.json");
+        let content = fs::read_to_string(&metadata_path)?;
+        let mut metadata: ListMetadata = serde_json::from_str(&content)?;
+        metadata.updated_at = Utc::now();
+        let json = serde_json::to_string_pretty(&metadata)?;
+        fs::write(&metadata_path, json)?;
 
         Ok(())
     }
