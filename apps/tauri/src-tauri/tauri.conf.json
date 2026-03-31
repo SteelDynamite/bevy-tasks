@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui-org/nicegui/v2/tauri-conf-schema.json",
-  "productName": "Bevy Tasks",
+  "productName": "Onyx",
   "version": "0.1.0",
-  "identifier": "com.bevytasks.app",
+  "identifier": "com.onyx.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1422",
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "Bevy Tasks",
+        "title": "Onyx",
         "width": 400,
         "height": 700,
         "minWidth": 320,

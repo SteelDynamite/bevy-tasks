@@ -20,7 +20,7 @@
   <div
     class="w-full max-w-sm rounded-2xl bg-card-light p-8 shadow-lg dark:bg-card-dark"
   >
-    <h1 class="mb-1 text-2xl font-bold">Bevy Tasks</h1>
+    <h1 class="mb-1 text-2xl font-bold">Onyx</h1>
     <p class="mb-6 text-sm text-text-secondary-light dark:text-text-secondary-dark">
       Create or open a workspace to get started.
     </p>

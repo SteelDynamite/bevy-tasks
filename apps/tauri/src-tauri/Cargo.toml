@@ -1,13 +1,13 @@
 [package]
-name = "bevy-tasks-tauri"
+name = "onyx-tauri"
 version = "0.1.0"
 edition = "2021"
-description = "Tauri v2 desktop GUI for Bevy Tasks"
+description = "Tauri v2 desktop GUI for Onyx"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/SteelDynamite/bevy-tasks"
+repository = "https://github.com/SteelDynamite/onyx"
 
 [lib]
-name = "bevy_tasks_tauri_lib"
+name = "onyx_tauri_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -19,7 +19,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-os = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-bevy-tasks-core = { path = "../../../crates/bevy-tasks-core" }
+onyx-core = { path = "../../../crates/onyx-core" }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
