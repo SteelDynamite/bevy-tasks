@@ -55,7 +55,7 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
     super.dispose();
   }
 
-  void _scheduleUpdate({String? dueDate}) {
+  void _scheduleUpdate({String? dueDate, bool? hasTime}) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () {
       final state = context.read<AppState>();
@@ -65,6 +65,7 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
         description: _descController.text,
         status: widget.task.status,
         dueDate: dueDate ?? widget.task.dueDate,
+        hasTime: hasTime ?? widget.task.hasTime,
         createdAt: widget.task.createdAt,
         updatedAt: widget.task.updatedAt,
         parentId: widget.task.parentId,
@@ -72,7 +73,7 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
     });
   }
 
-  void _updateDueDate(String? dueDate) {
+  void _updateDueDate(String? dueDate, {bool hasTime = false}) {
     final state = context.read<AppState>();
     state.updateTask(api.TaskDto(
       id: widget.task.id,
@@ -80,6 +81,7 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
       description: _descController.text,
       status: widget.task.status,
       dueDate: dueDate,
+      hasTime: hasTime,
       createdAt: widget.task.createdAt,
       updatedAt: widget.task.updatedAt,
       parentId: widget.task.parentId,
@@ -96,7 +98,8 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
       ),
       builder: (_) => DateTimePicker(
         initialDate: widget.task.dueDate != null ? DateTime.tryParse(widget.task.dueDate!) : null,
-        onDone: (date) => _updateDueDate(date.toUtc().toIso8601String()),
+        initialHasTime: widget.task.hasTime,
+        onDone: (date, hasTime) => _updateDueDate(date.toUtc().toIso8601String(), hasTime: hasTime),
         onClear: () => _updateDueDate(null),
       ),
     );
@@ -112,8 +115,7 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
     final dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final day = dayNames[local.weekday % 7];
     final pad = (int n) => n.toString().padLeft(2, '0');
-    final hasTime = local.hour != 0 || local.minute != 0;
-    final timePart = hasTime ? ', ${pad(local.hour)}:${pad(local.minute)}' : '';
+    final timePart = widget.task.hasTime ? ', ${pad(local.hour)}:${pad(local.minute)}' : '';
     if (taskDate == today) return 'Today$timePart';
     return '$day, ${pad(local.day)}/${pad(local.month)}$timePart';
   }

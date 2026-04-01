@@ -11,6 +11,8 @@ use onyx_core::{
     config::{AppConfig, WorkspaceConfig},
     models::{Task, TaskStatus},
     repository::TaskRepository,
+    sync::{self, SyncMode},
+    webdav,
 };
 
 // ── State ───────────────────────────────────────────────────────────
@@ -44,9 +46,19 @@ pub struct TaskDto {
     pub description: String,
     pub status: String,
     pub due_date: Option<String>,
+    pub has_time: bool,
     pub created_at: String,
     pub updated_at: String,
     pub parent_id: Option<String>,
+}
+
+pub struct SyncResultDto {
+    pub uploaded: u32,
+    pub downloaded: u32,
+    pub deleted_local: u32,
+    pub deleted_remote: u32,
+    pub conflicts: u32,
+    pub errors: Vec<String>,
 }
 
 pub struct TaskListDto {
@@ -79,6 +91,7 @@ fn task_to_dto(t: &Task) -> TaskDto {
             TaskStatus::Completed => "completed".into(),
         },
         due_date: t.due_date.map(|d| d.to_rfc3339()),
+        has_time: t.has_time,
         created_at: t.created_at.to_rfc3339(),
         updated_at: t.updated_at.to_rfc3339(),
         parent_id: t.parent_id.map(|id| id.to_string()),
@@ -218,6 +231,7 @@ pub fn update_task(list_id: String, task: TaskDto) -> Result<(), String> {
         .as_deref()
         .and_then(|d| chrono::DateTime::parse_from_rfc3339(d).ok())
         .map(|d| d.with_timezone(&chrono::Utc));
+    existing.has_time = task.has_time;
 
     s.repo.as_mut().unwrap().update_task(lid, existing).map_err(|e| e.to_string())
 }
@@ -293,6 +307,74 @@ pub fn get_group_by_due_date(list_id: String) -> Result<bool, String> {
     ensure_repo(&mut s)?;
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     s.repo.as_ref().unwrap().get_group_by_due_date(id).map_err(|e| e.to_string())
+}
+
+// ── Sync commands ──────────────────────────────────────────────────
+
+pub fn store_credentials(domain: String, username: String, password: String) -> Result<(), String> {
+    webdav::store_credentials(&domain, &username, &password).map_err(|e| e.to_string())
+}
+
+pub fn load_credentials(domain: String) -> Result<Vec<String>, String> {
+    let (u, p) = webdav::load_credentials(&domain).map_err(|e| e.to_string())?;
+    Ok(vec![u, p])
+}
+
+pub fn set_webdav_config(workspace_name: String, webdav_url: String) -> Result<(), String> {
+    let mut s = STATE.lock().unwrap();
+    if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
+        ws.webdav_url = Some(webdav_url);
+    }
+    let config_path = AppConfig::get_config_path();
+    s.config.save_to_file(&config_path).map_err(|e| e.to_string())
+}
+
+pub async fn test_webdav_connection(url: String, username: String, password: String) -> Result<(), String> {
+    let client = webdav::WebDavClient::new(&url, &username, &password);
+    client.test_connection().await.map_err(|e| e.to_string())
+}
+
+pub async fn sync_workspace_cmd(
+    workspace_name: String,
+    workspace_path: String,
+    webdav_url: String,
+    username: String,
+    password: String,
+    mode: String,
+) -> Result<SyncResultDto, String> {
+    let sync_mode = match mode.as_str() {
+        "push" => SyncMode::Push,
+        "pull" => SyncMode::Pull,
+        _ => SyncMode::Full,
+    };
+    let result = sync::sync_workspace(
+        &PathBuf::from(&workspace_path),
+        &webdav_url,
+        &username,
+        &password,
+        sync_mode,
+        None,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    {
+        let mut s = STATE.lock().unwrap();
+        if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
+            ws.last_sync = Some(chrono::Utc::now());
+        }
+        let config_path = AppConfig::get_config_path();
+        s.config.save_to_file(&config_path).map_err(|e| e.to_string())?;
+    }
+
+    Ok(SyncResultDto {
+        uploaded: result.uploaded,
+        downloaded: result.downloaded,
+        deleted_local: result.deleted_local,
+        deleted_remote: result.deleted_remote,
+        conflicts: result.conflicts,
+        errors: result.errors,
+    })
 }
 
 // ── File watcher ───────────────────────────────────────────────────

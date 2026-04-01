@@ -3,7 +3,7 @@ import '../theme.dart';
 import 'date_time_picker.dart';
 
 class NewTaskInput extends StatefulWidget {
-  final Future<void> Function(String title, String description, {String? dueDate}) onCreate;
+  final Future<void> Function(String title, String description, {String? dueDate, bool hasTime}) onCreate;
 
   const NewTaskInput({super.key, required this.onCreate});
 
@@ -16,6 +16,7 @@ class _NewTaskInputState extends State<NewTaskInput> {
   final _descController = TextEditingController();
   final _titleFocus = FocusNode();
   DateTime? _selectedDate;
+  bool _selectedHasTime = false;
 
   @override
   void initState() {
@@ -34,7 +35,7 @@ class _NewTaskInputState extends State<NewTaskInput> {
   Future<void> _submit() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) return;
-    await widget.onCreate(title, _descController.text.trim(), dueDate: _selectedDate?.toUtc().toIso8601String());
+    await widget.onCreate(title, _descController.text.trim(), dueDate: _selectedDate?.toUtc().toIso8601String(), hasTime: _selectedHasTime);
   }
 
   void _pickDate() {
@@ -47,8 +48,9 @@ class _NewTaskInputState extends State<NewTaskInput> {
       ),
       builder: (_) => DateTimePicker(
         initialDate: _selectedDate,
-        onDone: (date) => setState(() => _selectedDate = date),
-        onClear: () => setState(() => _selectedDate = null),
+        initialHasTime: _selectedHasTime,
+        onDone: (date, hasTime) => setState(() { _selectedDate = date; _selectedHasTime = hasTime; }),
+        onClear: () => setState(() { _selectedDate = null; _selectedHasTime = false; }),
       ),
     );
   }
@@ -60,8 +62,7 @@ class _NewTaskInputState extends State<NewTaskInput> {
     final dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final day = dayNames[d.weekday % 7];
     final pad = (int n) => n.toString().padLeft(2, '0');
-    final hasTime = d.hour != 0 || d.minute != 0;
-    final timePart = hasTime ? ', ${pad(d.hour)}:${pad(d.minute)}' : '';
+    final timePart = _selectedHasTime ? ', ${pad(d.hour)}:${pad(d.minute)}' : '';
     if (taskDate == today) return 'Today$timePart';
     return '$day, ${pad(d.day)}/${pad(d.month)}$timePart';
   }

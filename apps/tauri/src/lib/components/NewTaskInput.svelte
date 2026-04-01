@@ -10,6 +10,7 @@
   let title = $state("");
   let description = $state("");
   let dueDate = $state<string | null>(null);
+  let dueDateHasTime = $state(false);
   let inputEl = $state<HTMLInputElement | null>(null);
   let showDatePicker = $state(false);
 
@@ -17,11 +18,12 @@
     if (!title.trim()) return;
     const created = await app.createTask(title.trim(), description.trim() || undefined);
     if (dueDate && created) {
-      await app.updateTask({ ...created, due_date: dueDate, updated_at: new Date().toISOString() });
+      await app.updateTask({ ...created, due_date: dueDate, has_time: dueDateHasTime, updated_at: new Date().toISOString() });
     }
     title = "";
     description = "";
     dueDate = null;
+    dueDateHasTime = false;
     newTaskState.open = false;
   }
 
@@ -30,11 +32,13 @@
     title = "";
     description = "";
     dueDate = null;
+    dueDateHasTime = false;
     showDatePicker = false;
   }
 
-  function handleDateChange(iso: string | null) {
+  function handleDateChange(iso: string | null, hasTime: boolean = false) {
     dueDate = iso;
+    dueDateHasTime = hasTime;
   }
 
   function formatDateChip(iso: string): string {
@@ -43,8 +47,7 @@
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const day = dayNames[d.getDay()];
     const pad = (n: number) => String(n).padStart(2, "0");
-    const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
-    const timePart = hasTime ? `, ${pad(d.getHours())}:${pad(d.getMinutes())}` : "";
+    const timePart = dueDateHasTime ? `, ${pad(d.getHours())}:${pad(d.getMinutes())}` : "";
     if (d.toDateString() === today.toDateString()) return `Today${timePart}`;
     return `${day}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}${timePart}`;
   }
@@ -137,6 +140,7 @@
   {#if showDatePicker}
     <DateTimePicker
       value={dueDate}
+      has_time={dueDateHasTime}
       onchange={handleDateChange}
       onclose={() => (showDatePicker = false)}
     />

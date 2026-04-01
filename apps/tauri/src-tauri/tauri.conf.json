@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicegui-org/nicegui/v2/tauri-conf-schema.json",
   "productName": "Onyx",
   "version": "0.1.0",
   "identifier": "com.onyx.app",
@@ -29,7 +28,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["appimage", "deb"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

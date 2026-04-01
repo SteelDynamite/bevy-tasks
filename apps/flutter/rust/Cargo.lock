@@ -1194,6 +1194,7 @@ dependencies = [
  "notify-debouncer-mini",
  "once_cell",
  "onyx-core",
+ "tokio",
  "uuid",
 ]
 

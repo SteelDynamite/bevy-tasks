@@ -11,6 +11,8 @@ class AppState extends ChangeNotifier {
   bool darkMode = true;
   StreamSubscription? _watcherSub;
   bool syncing = false;
+  String syncMode = 'full';
+  api.SyncResultDto? lastSyncResult;
   String? error;
 
   // Selected task for detail view
@@ -261,6 +263,45 @@ class AppState extends ChangeNotifier {
 
   void selectTask(String? taskId) {
     selectedTaskId = taskId;
+    notifyListeners();
+  }
+
+  void setSyncMode(String mode) {
+    syncMode = mode;
+    notifyListeners();
+  }
+
+  Future<void> triggerSync() async {
+    if (config?.currentWorkspace == null) return;
+    final wsName = config!.currentWorkspace!;
+    final ws = config!.workspaces.firstWhere((w) => w.name == wsName);
+    if (ws.webdavUrl == null) {
+      error = 'No WebDAV URL configured';
+      notifyListeners();
+      return;
+    }
+    syncing = true;
+    error = null;
+    notifyListeners();
+    try {
+      final domain = Uri.parse(ws.webdavUrl!).host;
+      final creds = await api.loadCredentials(domain: domain);
+      final result = await api.syncWorkspaceCmd(
+        workspaceName: wsName,
+        workspacePath: ws.path,
+        webdavUrl: ws.webdavUrl!,
+        username: creds[0],
+        password: creds[1],
+        mode: syncMode,
+      );
+      lastSyncResult = result;
+      if (result.errors.isNotEmpty) error = result.errors.join('; ');
+      config = await api.getConfig();
+      await loadLists();
+    } catch (e) {
+      error = e.toString();
+    }
+    syncing = false;
     notifyListeners();
   }
 

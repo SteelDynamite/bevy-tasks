@@ -42,8 +42,8 @@
     debouncedSave({ description });
   }
 
-  function handleDateChange(iso: string | null) {
-    app.updateTask({ ...task, due_date: iso, updated_at: new Date().toISOString() });
+  function handleDateChange(iso: string | null, hasTime: boolean = false) {
+    app.updateTask({ ...task, due_date: iso, has_time: hasTime, updated_at: new Date().toISOString() });
   }
 
   async function handleToggle() {
@@ -79,7 +79,7 @@
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const day = dayNames[d.getDay()];
     const pad = (n: number) => String(n).padStart(2, "0");
-    const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+    const hasTime = task.has_time;
     const timePart = hasTime ? `, ${pad(d.getHours())}:${pad(d.getMinutes())}` : "";
     if (d.toDateString() === today.toDateString()) return `Today${timePart}`;
     return `${day}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}${timePart}`;
@@ -223,6 +223,7 @@
 {#if showDatePicker}
   <DateTimePicker
     value={task.due_date}
+    has_time={task.has_time}
     onchange={handleDateChange}
     onclose={() => (showDatePicker = false)}
   />

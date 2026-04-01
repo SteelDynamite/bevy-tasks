@@ -1,7 +1,8 @@
 <script lang="ts">
-  let { value = null, onchange, onclose }: {
+  let { value = null, has_time = false, onchange, onclose }: {
     value: string | null;
-    onchange: (iso: string | null) => void;
+    has_time: boolean;
+    onchange: (iso: string | null, has_time: boolean) => void;
     onclose: () => void;
   } = $props();
 
@@ -12,7 +13,7 @@
   let viewYear = $state(existing ? existing.getFullYear() : now.getFullYear());
   let viewMonth = $state(existing ? existing.getMonth() : now.getMonth());
   let selectedDay = $state(existing ? existing.getDate() : now.getDate());
-  let includeTime = $state(existing ? (existing.getHours() !== 0 || existing.getMinutes() !== 0) : false);
+  let includeTime = $state(has_time);
   let selectedHour = $state(existing ? existing.getHours() : now.getHours());
   let selectedMinute = $state(existing ? existing.getMinutes() : 0);
   let visible = $state(false);
@@ -66,12 +67,12 @@
     const h = includeTime ? selectedHour : 0;
     const m = includeTime ? selectedMinute : 0;
     const iso = new Date(viewYear, viewMonth, selectedDay, h, m).toISOString();
-    onchange(iso);
+    onchange(iso, includeTime);
     dismiss();
   }
 
   function clear() {
-    onchange(null);
+    onchange(null, false);
     dismiss();
   }
 </script>
