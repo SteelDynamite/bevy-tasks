@@ -550,9 +550,14 @@
       </div>
     </div>
 
-    <!-- Sync spinner -->
+    <!-- Sync status indicator -->
     {#if app.syncing}
       <div class="absolute bottom-4 right-4 z-20 h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+    {:else if app.lastSyncResult}
+      <div class="absolute bottom-4 right-4 z-20 flex items-center gap-1 rounded-full bg-black/10 px-2.5 py-1 text-xs opacity-60 dark:bg-white/10">
+        <span>↑{app.lastSyncResult.uploaded}</span>
+        <span>↓{app.lastSyncResult.downloaded}</span>
+      </div>
     {/if}
   </div>
 </div>

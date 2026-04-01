@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Instant;
 
+use chrono::Utc;
+
 use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
@@ -422,21 +424,40 @@ async fn test_webdav_connection(
 
 #[tauri::command]
 async fn sync_workspace(
+    workspace_name: String,
     workspace_path: String,
     webdav_url: String,
     username: String,
     password: String,
+    mode: String,
+    state: State<'_, Mutex<AppState>>,
 ) -> Result<SyncResult, String> {
+    let sync_mode = match mode.as_str() {
+        "push" => SyncMode::Push,
+        "pull" => SyncMode::Pull,
+        _ => SyncMode::Full,
+    };
     let result = sync::sync_workspace(
-        &PathBuf::from(workspace_path),
+        &PathBuf::from(&workspace_path),
         &webdav_url,
         &username,
         &password,
-        SyncMode::Full,
+        sync_mode,
         None,
     )
     .await
     .map_err(|e| e.to_string())?;
+
+    // Persist last_sync timestamp to config
+    {
+        let mut s = state.lock().unwrap();
+        if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
+            ws.last_sync = Some(Utc::now());
+        }
+        let config_path = AppConfig::get_config_path();
+        s.config.save_to_file(&config_path).map_err(|e| e.to_string())?;
+    }
+
     Ok(result.into())
 }
 
