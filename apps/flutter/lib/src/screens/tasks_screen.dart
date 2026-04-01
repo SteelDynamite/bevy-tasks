@@ -69,13 +69,13 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     });
   }
 
-  Future<void> _handleCreateTask(String title, String desc, {String? dueDate}) async {
+  Future<void> _handleCreateTask(String title, String desc, {String? dueDate, bool hasTime = false}) async {
     final state = context.read<AppState>();
     final task = await state.createTask(title, desc);
     if (task != null && dueDate != null) {
       await state.updateTask(api.TaskDto(
         id: task.id, title: task.title, description: task.description,
-        status: task.status, dueDate: dueDate,
+        status: task.status, dueDate: dueDate, hasTime: hasTime,
         createdAt: task.createdAt, updatedAt: task.updatedAt, parentId: task.parentId,
       ));
     }
@@ -255,6 +255,32 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                 ),
               ),
             ),
+          ),
+        ),
+        // Sync status indicator
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: IgnorePointer(
+            child: state.syncing
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppTheme.primary))
+                : state.lastSyncResult != null
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '↑${state.lastSyncResult!.uploaded} ↓${state.lastSyncResult!.downloaded}',
+                          style: TextStyle(fontSize: 11,
+                            color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.6)),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
           ),
         ),
       ],

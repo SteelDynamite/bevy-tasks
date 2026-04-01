@@ -3,10 +3,11 @@ import '../theme.dart';
 
 class DateTimePicker extends StatefulWidget {
   final DateTime? initialDate;
-  final void Function(DateTime date) onDone;
+  final bool initialHasTime;
+  final void Function(DateTime date, bool hasTime) onDone;
   final VoidCallback onClear;
 
-  const DateTimePicker({super.key, this.initialDate, required this.onDone, required this.onClear});
+  const DateTimePicker({super.key, this.initialDate, this.initialHasTime = false, required this.onDone, required this.onClear});
 
   @override
   State<DateTimePicker> createState() => _DateTimePickerState();
@@ -27,7 +28,7 @@ class _DateTimePickerState extends State<DateTimePicker> {
     if (widget.initialDate != null) {
       _hour = widget.initialDate!.hour;
       _minute = widget.initialDate!.minute;
-      _showTime = _hour != 0 || _minute != 0;
+      _showTime = widget.initialHasTime;
     }
   }
 
@@ -39,7 +40,7 @@ class _DateTimePickerState extends State<DateTimePicker> {
     final result = _showTime
         ? DateTime(_selected!.year, _selected!.month, _selected!.day, _hour, _minute)
         : DateTime(_selected!.year, _selected!.month, _selected!.day);
-    widget.onDone(result);
+    widget.onDone(result, _showTime);
     Navigator.of(context).pop();
   }
 

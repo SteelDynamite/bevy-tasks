@@ -87,6 +87,53 @@ Future<void> setGroupByDueDate({
 Future<bool> getGroupByDueDate({required String listId}) =>
     RustLib.instance.api.crateApiGetGroupByDueDate(listId: listId);
 
+Future<void> storeCredentials({
+  required String domain,
+  required String username,
+  required String password,
+}) => RustLib.instance.api.crateApiStoreCredentials(
+  domain: domain,
+  username: username,
+  password: password,
+);
+
+Future<List<String>> loadCredentials({required String domain}) =>
+    RustLib.instance.api.crateApiLoadCredentials(domain: domain);
+
+Future<void> setWebdavConfig({
+  required String workspaceName,
+  required String webdavUrl,
+}) => RustLib.instance.api.crateApiSetWebdavConfig(
+  workspaceName: workspaceName,
+  webdavUrl: webdavUrl,
+);
+
+Future<void> testWebdavConnection({
+  required String url,
+  required String username,
+  required String password,
+}) => RustLib.instance.api.crateApiTestWebdavConnection(
+  url: url,
+  username: username,
+  password: password,
+);
+
+Future<SyncResultDto> syncWorkspaceCmd({
+  required String workspaceName,
+  required String workspacePath,
+  required String webdavUrl,
+  required String username,
+  required String password,
+  required String mode,
+}) => RustLib.instance.api.crateApiSyncWorkspaceCmd(
+  workspaceName: workspaceName,
+  workspacePath: workspacePath,
+  webdavUrl: webdavUrl,
+  username: username,
+  password: password,
+  mode: mode,
+);
+
 Future<Stream<void>> watchWorkspaceChanges({required String path}) =>
     RustLib.instance.api.crateApiWatchWorkspaceChanges(path: path);
 
@@ -111,12 +158,52 @@ class AppConfigDto {
           currentWorkspace == other.currentWorkspace;
 }
 
+class SyncResultDto {
+  final int uploaded;
+  final int downloaded;
+  final int deletedLocal;
+  final int deletedRemote;
+  final int conflicts;
+  final List<String> errors;
+
+  const SyncResultDto({
+    required this.uploaded,
+    required this.downloaded,
+    required this.deletedLocal,
+    required this.deletedRemote,
+    required this.conflicts,
+    required this.errors,
+  });
+
+  @override
+  int get hashCode =>
+      uploaded.hashCode ^
+      downloaded.hashCode ^
+      deletedLocal.hashCode ^
+      deletedRemote.hashCode ^
+      conflicts.hashCode ^
+      errors.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SyncResultDto &&
+          runtimeType == other.runtimeType &&
+          uploaded == other.uploaded &&
+          downloaded == other.downloaded &&
+          deletedLocal == other.deletedLocal &&
+          deletedRemote == other.deletedRemote &&
+          conflicts == other.conflicts &&
+          errors == other.errors;
+}
+
 class TaskDto {
   final String id;
   final String title;
   final String description;
   final String status;
   final String? dueDate;
+  final bool hasTime;
   final String createdAt;
   final String updatedAt;
   final String? parentId;
@@ -127,6 +214,7 @@ class TaskDto {
     required this.description,
     required this.status,
     this.dueDate,
+    required this.hasTime,
     required this.createdAt,
     required this.updatedAt,
     this.parentId,
@@ -139,6 +227,7 @@ class TaskDto {
       description.hashCode ^
       status.hashCode ^
       dueDate.hashCode ^
+      hasTime.hashCode ^
       createdAt.hashCode ^
       updatedAt.hashCode ^
       parentId.hashCode;
@@ -153,6 +242,7 @@ class TaskDto {
           description == other.description &&
           status == other.status &&
           dueDate == other.dueDate &&
+          hasTime == other.hasTime &&
           createdAt == other.createdAt &&
           updatedAt == other.updatedAt &&
           parentId == other.parentId;
