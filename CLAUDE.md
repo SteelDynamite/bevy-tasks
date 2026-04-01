@@ -56,11 +56,11 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - **Kebab menus**: Tasks, lists, and workspaces all use kebab → submenu pattern for delete.
 - **New task**: FAB button opens bottom toast sheet (outside sliding container for fixed positioning).
 
-### Current state (2026-03-31)
+### Current state (2026-04-01)
 
 - **Phase 1** (Core + CLI): Complete
 - **Phase 2** (WebDAV sync): Backend done, CLI done, GUI wired (settings auto-populates credentials)
-- **Phase 3** (GUI MVP): Near complete — core features working, both Tauri and Flutter GUIs maintained
+- **Phase 3** (GUI MVP): Complete — both Tauri and Flutter GUIs at feature parity
 
 ### GUI features done
 
@@ -73,7 +73,7 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Workspace switcher drop-up with add/remove
 - Dark mode (GNOME-style neutral grays, cyan-blue accent)
 - Completed tasks section with animated show/hide
-- Due date picker/editor (DateTimePicker in new task + task detail)
+- Due date picker/editor (DateTimePicker in new task + task detail); `has_time: bool` field tracks whether time is set
 - Move task between lists (kebab menu → "Move to..." submenu)
 - List rename (inline input via list kebab menu)
 - Group-by-due-date toggle per list (list kebab menu)
@@ -81,15 +81,17 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - WebDAV setup flow (settings auto-populates URL/credentials from config + keychain)
 - File watcher (notify crate, 500ms debounce, auto-reloads on external changes)
 - Setup screen with window dragging + "Open Existing Folder" option
+- Sync status indicators (last-sync time + upload/download counts chip)
+- Push/pull/full sync mode selection (session-only, in settings)
+- Desktop packaging (Linux: AppImage + .deb)
+- Flutter GUI at full parity with Tauri (WebDAV UI, has_time, sync status, sync mode)
 
 ### GUI features NOT yet done
 
-- Push-only / pull-only sync modes
-- Sync status view/indicators
 - Workspace retarget/migrate
 - Subtask hierarchy (data model exists, not used anywhere)
 - Search/filter tasks
-- Desktop packaging (Windows, Linux, macOS)
+- Desktop packaging for Windows and macOS
 
 ## Roadmap
 

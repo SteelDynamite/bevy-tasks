@@ -716,17 +716,17 @@ WorkspaceConfig {
 - [x] Dark mode (GNOME-style neutral theme, cyan-blue accent)
 - [x] Animated completed section show/hide
 - [x] Move task between lists (kebab menu → "Move to..." submenu in task detail view)
-- [ ] Optional time on due dates (backend `due_date` is `DateTime<Utc>` — needs a separate `due_time` field or a nullable time component so date-only tasks don't default to midnight; currently the GUI uses `hours == 0 && minutes == 0` as a heuristic for "no time set" which breaks for actual midnight times)
+- [x] Optional time on due dates (`has_time: bool` field on Task with `#[serde(default)]` for backward compat; replaces the hours==0 heuristic)
 - [x] Due date picker/editor (DateTimePicker component in both new task toast + task detail view)
 - [x] WebDAV setup flow with credentials (settings auto-populates URL/username/password from config + keychain on open)
 - [x] List rename (inline input via list kebab menu in drawer)
 - [x] Keyboard shortcuts (Escape closes settings → detail → drawer → menus in priority order)
-- [ ] Sync status indicators (per workspace)
-- [ ] Push/pull sync mode selection
+- [x] Sync status indicators (last-sync time + upload/download counts chip in TasksScreen)
+- [x] Push/pull sync mode selection (session-only sync direction selector in SettingsScreen)
 - [x] Group-by-due-date toggle per list (checkmark toggle in list kebab menu)
 - [ ] Subtask hierarchy (data model exists, needs UI)
 - [ ] Search/filter tasks
-- [ ] Desktop packaging (Windows, Linux, macOS)
+- [x] Desktop packaging (Linux: AppImage + .deb; Windows/macOS not yet verified)
 - [x] File watcher (notify crate, 500ms debounce, auto-reloads UI on external file changes)
 
 ### Deliverables
@@ -735,6 +735,7 @@ WorkspaceConfig {
 - [ ] Sub-300ms startup time (not yet measured/optimized)
 - [x] Clean, minimal UI
 - [ ] Feature parity with CLI
+- [x] Flutter GUI at feature parity with Tauri (WebDAV, has_time, sync status, sync mode)
 
 ### Build & Release
 
