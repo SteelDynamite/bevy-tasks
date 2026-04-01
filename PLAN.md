@@ -749,73 +749,147 @@ WorkspaceConfig {
 
 ## Phase 4: Mobile Basic Support
 
-**Goal**: Get app running on iOS and Android ASAP, validate architecture
+**Goal**: Get both GUIs building and running on Android and iOS, validate cross-platform architecture
 
 ### Why Early Mobile?
 - De-risk mobile builds early in development
 - Test cross-platform architecture sooner
-- Tauri v2 has first-class mobile support — same codebase as desktop
 - Get mobile-specific feedback early
 - Can dogfood on mobile while building desktop features
 
-### Architecture
+### Hard Constraint: iOS Requires macOS
 
-#### Mobile Build Setup (Tauri v2 Mobile)
+iOS builds require Xcode, which only runs on macOS. Android builds work fine on Linux. Options for iOS CI:
+- **GitHub Actions** `macos-latest` runner (free for public repos, paid minutes for private)
+- **Codemagic / Bitrise** — dedicated mobile CI services
+- A physical Mac
 
-Tauri v2 supports iOS and Android natively. The same Svelte frontend and Rust backend are used, with platform-specific configuration.
+All Android work can be done locally on Linux. iOS must go through CI or a Mac.
 
-**iOS**:
-- Tauri generates Xcode project
-- Bundle identifier: `com.onyx.app`
-- Target: `aarch64-apple-ios`
+---
 
-**Android**:
-- Tauri generates Gradle project
-- Min SDK: 26 (Android 8.0)
-- NDK handles Rust compilation
+### Flutter GUI (Priority Path)
 
-#### Mobile Adaptation
+Flutter + flutter_rust_bridge was designed for mobile from the start and is the lower-risk path.
+
+#### Known Blockers
+
+**`window_manager` is desktop-only** (`pubspec.yaml` line 13). This package crashes or fails to compile on mobile. Must be gated behind `Platform.isDesktop` checks before any mobile build will succeed.
+
+**No platform directories exist yet.** `apps/flutter/android/` and `apps/flutter/ios/` have not been generated. Run `flutter create --platforms android,ios .` from `apps/flutter/` to scaffold them.
+
+#### Android Prerequisites
+
+1. Android Studio + NDK installed, `ANDROID_HOME` and `NDK_HOME` set
+2. `cargo install cargo-ndk`
+3. Rust Android targets: `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`
+
+flutter_rust_bridge invokes cargo-ndk automatically during `flutter build apk` — no manual cross-compilation step needed.
+
+#### Build Commands
+
+```bash
+# Android
+cd apps/flutter
+flutter build apk          # release APK
+flutter build apk --debug  # debug APK for sideloading
+
+# iOS (macOS CI only)
+flutter build ios --no-codesign   # unsigned build for simulator
+flutter build ipa                  # signed IPA for TestFlight
+```
+
+#### Features
+
+- [ ] Gate `window_manager` behind `Platform.isDesktop` checks
+- [ ] Generate Android platform (`flutter create --platforms android .`)
+- [ ] Generate iOS platform (`flutter create --platforms ios .`)
+- [ ] Install cargo-ndk + Android Rust targets (Android prereqs)
+- [ ] Confirm `flutter build apk` succeeds locally
+- [ ] Set up macOS CI for iOS builds
+- [ ] Confirm `flutter build ios` succeeds on CI
+- [ ] Basic smoke test: app launches, workspace setup, create a task
+
+---
+
+### Tauri GUI
+
+Tauri v2 has mobile support but it's newer and less mature. Requires more code surgery than Flutter.
+
+#### Known Blockers
+
+**`notify` crate doesn't compile for mobile.** The file-watcher subsystem (`notify` + `notify-debouncer-mini` in `Cargo.toml`) does not support Android or iOS targets. The entire file-watcher initialization path must be gated behind `#[cfg(not(mobile))]` before cross-compilation will succeed.
+
+**Desktop-only window config.** `tauri.conf.json` has `decorations: false` and `transparent: true` — these are ignored on mobile but may cause confusion. Mobile uses full-screen native WebViews.
+
+**No mobile init done.** `gen/android/` and `gen/ios/` Gradle/Xcode projects have not been generated yet.
+
+#### Android Prerequisites
+
+1. Android Studio + NDK r26+ installed, `ANDROID_HOME` and `NDK_HOME` set
+2. Rust Android targets: `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`
+
+#### Build Commands
+
+```bash
+cd apps/tauri
+
+# Android
+npm run tauri android init   # first time: generates gen/android/
+npm run tauri android dev    # dev build with hot reload
+npm run tauri android build  # release APK/AAB
+
+# iOS (macOS CI only)
+npm run tauri ios init       # first time: generates gen/ios/
+npm run tauri ios dev
+npm run tauri ios build
+```
+
+#### Features
+
+- [ ] Gate file-watcher initialization behind `#[cfg(not(mobile))]`
+- [ ] Install Android Studio + NDK, configure env vars
+- [ ] Add Android Rust targets
+- [ ] `npm run tauri android init` (generates `gen/android/`)
+- [ ] Confirm `npm run tauri android build` succeeds
+- [ ] Set up macOS CI for iOS builds
+- [ ] `npm run tauri ios init` (generates `gen/ios/`)
+- [ ] Confirm `npm run tauri ios build` succeeds on CI
+- [ ] Basic smoke test: app launches, workspace setup, create a task
+
+---
+
+### Shared Mobile Adaptation (Both GUIs)
 
 **Touch Support**:
-- Tailwind responsive utilities for mobile-friendly layouts
 - Larger touch targets (44pt minimum)
-- Mobile-specific Svelte components where needed
+- Mobile-responsive layouts
 - Test on real devices
 
 **File System Access**:
-- iOS: App sandbox documents directory + Tauri file dialog plugin
-- Android: Scoped storage + Tauri file dialog plugin
+- iOS: App sandbox documents directory + file dialog plugin
+- Android: Scoped storage + file dialog plugin
 
-#### First Run on Mobile
+**First Run on Mobile**:
 - Show folder picker on first launch
-- Suggest locations: Documents, iCloud Drive (iOS), Google Drive (Android)
+- Suggest: Documents, iCloud Drive (iOS), Google Drive (Android)
 - User selects folder, path stored in preferences
-
-### Features
-
-- [ ] Tauri v2 iOS build pipeline setup
-- [ ] Tauri v2 Android build pipeline setup
-- [ ] Mobile-responsive Svelte/Tailwind layout
-- [ ] File system access on iOS
-- [ ] File system access on Android
-- [ ] Folder picker for mobile
-- [ ] Basic task CRUD on mobile
-- [ ] Test on real devices
 
 ### Deliverables
 
-- [ ] App launches on iOS
-- [ ] App launches on Android
-- [ ] Can create and view tasks on mobile
+- [ ] Flutter APK builds locally on Linux (Android)
+- [ ] Tauri APK builds locally on Linux (Android)
+- [ ] Flutter iOS builds on macOS CI
+- [ ] Tauri iOS builds on macOS CI
+- [ ] Basic task CRUD works on mobile (both GUIs)
 - [ ] Validates cross-platform architecture
-- [ ] Foundation for future mobile polish
 
 ### Distribution
 
-- iOS: .ipa for TestFlight (early access)
 - Android: .apk (direct install / sideloading)
+- iOS: .ipa for TestFlight (early access)
 
-**Note**: This phase prioritizes getting mobile working, even with a simple UI. Polish comes in Phase 6.
+**Note**: This phase prioritizes getting mobile building and launching, even with a simple UI. Touch polish comes in Phase 6.
 
 ---
 
@@ -983,6 +1057,6 @@ This project is free and open-source software licensed under GPL v3.
 
 ---
 
-**Last Updated**: 2026-03-30
-**Document Version**: 4.0
+**Last Updated**: 2026-04-01
+**Document Version**: 4.1
 **Status**: Ready to Implement - Milestone-Driven Plan
