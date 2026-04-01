@@ -56,6 +56,8 @@ pub struct TaskFrontmatter {
     pub status: TaskStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub due: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub has_time: bool,
     pub created: DateTime<Utc>,
     pub updated: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -68,6 +70,7 @@ impl From<&Task> for TaskFrontmatter {
             id: task.id,
             status: task.status,
             due: task.due_date,
+            has_time: task.has_time,
             created: task.created_at,
             updated: task.updated_at,
             parent: task.parent_id,
@@ -256,6 +259,7 @@ impl Storage for FileSystemStorage {
                         description,
                         status: frontmatter.status,
                         due_date: frontmatter.due,
+                        has_time: frontmatter.has_time,
                         created_at: frontmatter.created,
                         updated_at: frontmatter.updated,
                         parent_id: frontmatter.parent,
@@ -344,6 +348,7 @@ impl Storage for FileSystemStorage {
                     description,
                     status: frontmatter.status,
                     due_date: frontmatter.due,
+                    has_time: frontmatter.has_time,
                     created_at: frontmatter.created,
                     updated_at: frontmatter.updated,
                     parent_id: frontmatter.parent,

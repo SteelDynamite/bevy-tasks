@@ -17,6 +17,8 @@ pub struct Task {
     pub status: TaskStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub due_date: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub has_time: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -32,6 +34,7 @@ impl Task {
             description: String::new(),
             status: TaskStatus::Backlog,
             due_date: None,
+            has_time: false,
             created_at: now,
             updated_at: now,
             parent_id: None,
