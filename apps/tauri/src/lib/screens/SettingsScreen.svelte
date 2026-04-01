@@ -126,7 +126,7 @@
         <select
           value={app.syncMode}
           onchange={(e) => app.setSyncMode((e.target as HTMLSelectElement).value as "full" | "push" | "pull")}
-          class="rounded-lg border border-border-light bg-transparent px-3 py-2 text-sm outline-none focus:border-primary dark:border-border-dark"
+          class="appearance-none rounded-lg border border-border-light bg-surface-light px-3 py-2 text-sm text-text-light outline-none focus:border-primary dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
         >
           <option value="full">Sync both ways</option>
           <option value="push">Push only</option>
