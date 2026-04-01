@@ -138,33 +138,17 @@ class _DateTimePickerState extends State<DateTimePicker> {
             );
           }),
           const SizedBox(height: 8),
-          // Time toggle
+          // Time section
           Container(
             padding: const EdgeInsets.only(top: 12),
             decoration: BoxDecoration(
               border: Border(top: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderLight, width: 0.5)),
             ),
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: () => setState(() => _showTime = !_showTime),
-                  child: Row(
+            child: _showTime
+                ? Row(
                     children: [
-                      Icon(Icons.access_time, size: 16, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight),
-                      const SizedBox(width: 8),
-                      Text(_showTime ? 'Time' : 'Set time',
-                        style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight)),
-                      const Spacer(),
-                      Icon(_showTime ? Icons.expand_less : Icons.expand_more, size: 18,
-                        color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight),
-                    ],
-                  ),
-                ),
-                if (_showTime) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                      Text('Time', style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight)),
+                      const SizedBox(width: 12),
                       // Hour
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -181,7 +165,7 @@ class _DateTimePickerState extends State<DateTimePicker> {
                           onChanged: (v) => setState(() => _hour = v!),
                         ),
                       ),
-                      const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text(':', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text(':', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
                       // Minute
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -198,11 +182,17 @@ class _DateTimePickerState extends State<DateTimePicker> {
                           onChanged: (v) => setState(() => _minute = v!),
                         ),
                       ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () { setState(() => _showTime = false); _done(); },
+                        child: Icon(Icons.close, size: 18, color: (isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight).withAlpha(160)),
+                      ),
                     ],
+                  )
+                : GestureDetector(
+                    onTap: () => setState(() { _showTime = true; if (_selected == null) _selected = DateTime.now(); }),
+                    child: Text('Set time', style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight)),
                   ),
-                ],
-              ],
-            ),
           ),
           // Clear button
           if (widget.initialDate != null) ...[
