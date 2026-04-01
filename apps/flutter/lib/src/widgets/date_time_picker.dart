@@ -184,7 +184,7 @@ class _DateTimePickerState extends State<DateTimePicker> {
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () { setState(() => _showTime = false); _done(); },
+                        onTap: () => setState(() => _showTime = false),
                         child: Icon(Icons.close, size: 18, color: (isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight).withAlpha(160)),
                       ),
                     ],
