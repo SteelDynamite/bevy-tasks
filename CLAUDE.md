@@ -32,6 +32,7 @@ Two-crate workspace (`resolver = "2"`, edition 2021) plus a Tauri app:
 - **onyx-core** — Pure Rust library. Storage trait with `FileSystemStorage` implementation, `TaskRepository` (main API), data models, config, error types. No CLI/UI dependencies. `keyring` feature-gated behind `keyring-storage` (default on) for Android compatibility.
 - **onyx-cli** — CLI frontend using clap. Commands are in `src/commands/` (init, workspace, list, task, group). Output formatting in `src/output.rs`.
 - **apps/tauri/** — Tauri v2 GUI. Svelte 5 frontend in `src/`, Rust backend in `src-tauri/` with Tauri commands that call into `onyx-core`. `notify` crate feature-gated for Android.
+
 ### Key patterns
 
 - **Storage trait** (`storage.rs`): Strategy pattern for task persistence. `FileSystemStorage` reads/writes markdown files with YAML frontmatter and JSON metadata files.

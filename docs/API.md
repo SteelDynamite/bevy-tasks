@@ -441,10 +441,9 @@ Key test areas:
 
 ## Thread Safety
 
-**Note:** The current implementation is not thread-safe. If you need concurrent access:
+The `Storage` trait requires `Send + Sync`, and `TaskRepository` wraps `Box<dyn Storage + Send + Sync>`, so repository instances can be shared across threads behind a `Mutex`. The Tauri GUI uses `Mutex<AppState>` for this purpose.
 
-1. Use external synchronization (e.g., `Mutex<TaskRepository>`)
-2. Create separate repository instances per thread (file system will handle locking)
-3. Consider implementing a service layer with proper locking
+For concurrent access:
 
-Future versions may include built-in concurrency support.
+1. Wrap `TaskRepository` in `Mutex` or `RwLock` (the Tauri app does this)
+2. Or create separate repository instances per thread (file system handles locking)
