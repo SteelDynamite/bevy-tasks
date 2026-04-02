@@ -204,18 +204,20 @@ fn print_workspace_status(name: &str, path: &std::path::Path, webdav_url: Option
     Ok(())
 }
 
-/// Extract domain from a URL for credential storage.
+/// Extract host from a URL for credential storage.
 fn extract_domain(url: &str) -> String {
-    url.split("://")
-        .nth(1)
-        .unwrap_or(url)
-        .split('/')
-        .next()
-        .unwrap_or(url)
-        .split(':')
-        .next()
-        .unwrap_or(url)
-        .to_string()
+    // Strip scheme
+    let after_scheme = url.split("://").nth(1).unwrap_or(url);
+    // Strip path
+    let authority = after_scheme.split('/').next().unwrap_or(after_scheme);
+    // Strip userinfo (user:pass@host)
+    let host_port = if let Some(at_pos) = authority.rfind('@') {
+        &authority[at_pos + 1..]
+    } else {
+        authority
+    };
+    // Strip port
+    host_port.split(':').next().unwrap_or(host_port).to_string()
 }
 
 /// Prompt the user for text input.

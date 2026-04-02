@@ -149,8 +149,30 @@ impl FileSystemStorage {
         Err(Error::ListNotFound(list_id.to_string()))
     }
 
-    fn list_dir_path_by_name(&self, name: &str) -> PathBuf {
-        self.root_path.join(name)
+    fn list_dir_path_by_name(&self, name: &str) -> Result<PathBuf> {
+        let path = self.root_path.join(name);
+        // Prevent path traversal: resolved path must stay within root
+        let canonical_root = self.root_path.canonicalize()
+            .unwrap_or_else(|_| self.root_path.clone());
+        let canonical_path = if path.exists() {
+            path.canonicalize().unwrap_or_else(|_| path.clone())
+        } else {
+            // For non-existent paths, normalize by resolving the parent
+            if let Some(parent) = path.parent() {
+                let canonical_parent = if parent.exists() {
+                    parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf())
+                } else {
+                    parent.to_path_buf()
+                };
+                canonical_parent.join(path.file_name().unwrap_or_default())
+            } else {
+                path.clone()
+            }
+        };
+        if !canonical_path.starts_with(&canonical_root) {
+            return Err(Error::InvalidData(format!("Invalid list name: path escapes workspace")));
+        }
+        Ok(path)
     }
 
     fn sanitize_filename(name: &str) -> String {
@@ -371,7 +393,7 @@ impl Storage for FileSystemStorage {
     }
 
     fn create_list(&mut self, name: String) -> Result<TaskList> {
-        let list_dir = self.list_dir_path_by_name(&name);
+        let list_dir = self.list_dir_path_by_name(&name)?;
 
         if list_dir.exists() {
             return Err(Error::InvalidData(format!("List '{}' already exists", name)));
@@ -473,7 +495,7 @@ impl Storage for FileSystemStorage {
 
     fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()> {
         let old_dir = self.list_dir_path(list_id)?;
-        let new_dir = self.list_dir_path_by_name(&new_name);
+        let new_dir = self.list_dir_path_by_name(&new_name)?;
 
         if new_dir.exists() {
             return Err(Error::InvalidData(format!("A list named '{}' already exists", new_name)));
