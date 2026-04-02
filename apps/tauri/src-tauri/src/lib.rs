@@ -30,6 +30,7 @@ static LAST_WRITE: Mutex<Option<Instant>> = Mutex::new(None);
 /// Shared application state behind a mutex.
 struct AppState {
     config: AppConfig,
+    config_path: PathBuf,
     repo: Option<TaskRepository>,
 }
 
@@ -91,8 +92,7 @@ fn get_config(state: State<'_, Mutex<AppState>>) -> Result<AppConfig, String> {
 #[tauri::command]
 fn save_config(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
     let s = state.lock().unwrap();
-    let path = AppConfig::get_config_path();
-    s.config.save_to_file(&path).map_err(|e| e.to_string())
+    s.config.save_to_file(&s.config_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -109,9 +109,8 @@ fn add_workspace(
         .map_err(|e| e.to_string())?;
     // Reset repo so it reopens on next access
     s.repo = None;
-    let config_path = AppConfig::get_config_path();
     s.config
-        .save_to_file(&config_path)
+        .save_to_file(&s.config_path.clone())
         .map_err(|e| e.to_string())
 }
 
@@ -125,9 +124,8 @@ fn set_current_workspace(
         .set_current_workspace(name)
         .map_err(|e| e.to_string())?;
     s.repo = None;
-    let config_path = AppConfig::get_config_path();
     s.config
-        .save_to_file(&config_path)
+        .save_to_file(&s.config_path.clone())
         .map_err(|e| e.to_string())
 }
 
@@ -139,9 +137,8 @@ fn remove_workspace(
     let mut s = state.lock().unwrap();
     s.config.remove_workspace(&name);
     s.repo = None;
-    let config_path = AppConfig::get_config_path();
     s.config
-        .save_to_file(&config_path)
+        .save_to_file(&s.config_path.clone())
         .map_err(|e| e.to_string())
 }
 
@@ -420,9 +417,8 @@ fn set_webdav_config(
     if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
         ws.webdav_url = Some(webdav_url);
     }
-    let config_path = AppConfig::get_config_path();
     s.config
-        .save_to_file(&config_path)
+        .save_to_file(&s.config_path.clone())
         .map_err(|e| e.to_string())
 }
 
@@ -485,8 +481,7 @@ async fn sync_workspace(
         if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
             ws.last_sync = Some(Utc::now());
         }
-        let config_path = AppConfig::get_config_path();
-        s.config.save_to_file(&config_path).map_err(|e| e.to_string())?;
+        s.config.save_to_file(&s.config_path.clone()).map_err(|e| e.to_string())?;
     }
 
     Ok(result.into())
@@ -541,23 +536,29 @@ fn watch_workspace(_path: String, _app_handle: tauri::AppHandle) -> Result<(), S
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Load or create config
-    let config_path = AppConfig::get_config_path();
-    let config = AppConfig::load_from_file(&config_path).unwrap_or_default();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
-        .manage(Mutex::new(AppState { config, repo: None }))
         .setup(|app| {
-            let handle = app.handle().clone();
-            let state: State<'_, Mutex<AppState>> = app.state();
-            let workspace_path = {
-                let s = state.lock().unwrap();
-                s.config.get_current_workspace().ok().map(|(_, ws)| ws.path.clone())
+            // Resolve config path: Tauri's app_data_dir on Android, directories crate on desktop
+            let config_path = {
+                #[cfg(target_os = "android")]
+                {
+                    use tauri::Manager;
+                    app.path().app_data_dir().expect("Failed to get app data dir").join("config.json")
+                }
+                #[cfg(not(target_os = "android"))]
+                {
+                    AppConfig::get_config_path()
+                }
             };
+            let config = AppConfig::load_from_file(&config_path).unwrap_or_default();
+            let workspace_path = config.get_current_workspace().ok().map(|(_, ws)| ws.path.clone());
+            app.manage(Mutex::new(AppState { config, config_path, repo: None }));
+
             #[cfg(not(target_os = "android"))]
             if let Some(path) = workspace_path {
+                let handle = app.handle().clone();
                 start_watcher(handle, path);
             }
             Ok(())
