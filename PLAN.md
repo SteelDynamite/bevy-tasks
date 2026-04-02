@@ -735,7 +735,6 @@ WorkspaceConfig {
 - [ ] Sub-300ms startup time (not yet measured/optimized)
 - [x] Clean, minimal UI
 - [ ] Feature parity with CLI
-- [x] Flutter GUI at feature parity with Tauri (WebDAV, has_time, sync status, sync mode)
 
 ### Build & Release
 
@@ -750,7 +749,7 @@ WorkspaceConfig {
 
 ## Phase 4: Mobile Basic Support
 
-**Goal**: Get both GUIs building and running on Android and iOS, validate cross-platform architecture
+**Goal**: Get the Tauri GUI building and running on Android and iOS, validate cross-platform architecture
 
 ### Why Early Mobile?
 - De-risk mobile builds early in development
@@ -769,55 +768,7 @@ All Android work can be done locally on Linux. iOS must go through CI or a Mac.
 
 ---
 
-### Flutter GUI (Priority Path)
-
-Flutter + flutter_rust_bridge was designed for mobile from the start and is the lower-risk path.
-
-#### Known Blockers
-
-**`window_manager` is desktop-only** (`pubspec.yaml` line 13). This package crashes or fails to compile on mobile. Must be gated behind `Platform.isDesktop` checks before any mobile build will succeed.
-
-**No platform directories exist yet.** `apps/flutter/android/` and `apps/flutter/ios/` have not been generated. Run `flutter create --platforms android,ios .` from `apps/flutter/` to scaffold them.
-
-#### Android Prerequisites
-
-1. Android Studio + NDK installed, `ANDROID_HOME` and `NDK_HOME` set
-2. `cargo install cargo-ndk`
-3. Rust Android targets: `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`
-
-flutter_rust_bridge invokes cargo-ndk automatically during `flutter build apk` — no manual cross-compilation step needed.
-
-#### Build Commands
-
-```bash
-# Android
-cd apps/flutter
-flutter build apk          # release APK
-flutter build apk --debug  # debug APK for sideloading
-
-# iOS (macOS CI only)
-flutter build ios --no-codesign   # unsigned build for simulator
-flutter build ipa                  # signed IPA for TestFlight
-```
-
-#### Features
-
-- [ ] Gate `window_manager` behind `Platform.isDesktop` checks
-- [ ] Generate Android platform (`flutter create --platforms android .`)
-- [ ] Generate iOS platform (`flutter create --platforms ios .`)
-- [ ] Install cargo-ndk + Android Rust targets (Android prereqs)
-- [ ] Confirm `flutter build apk` succeeds locally
-- [ ] Set up macOS CI for iOS builds
-- [ ] Confirm `flutter build ios` succeeds on CI
-- [ ] Basic smoke test: app launches, workspace setup, create a task
-
----
-
-### Tauri GUI
-
-Tauri v2 has mobile support but it's newer and less mature. Requires more code surgery than Flutter.
-
-#### Known Blockers
+### Known Blockers
 
 **`notify` crate doesn't compile for mobile.** The file-watcher subsystem (`notify` + `notify-debouncer-mini` in `Cargo.toml`) does not support Android or iOS targets. The entire file-watcher initialization path must be gated behind `#[cfg(not(mobile))]` before cross-compilation will succeed.
 
@@ -860,7 +811,7 @@ npm run tauri ios build
 
 ---
 
-### Shared Mobile Adaptation (Both GUIs)
+### Mobile Adaptation
 
 **Touch Support**:
 - Larger touch targets (44pt minimum)
@@ -878,11 +829,9 @@ npm run tauri ios build
 
 ### Deliverables
 
-- [ ] Flutter APK builds locally on Linux (Android)
 - [ ] Tauri APK builds locally on Linux (Android)
-- [ ] Flutter iOS builds on macOS CI
 - [ ] Tauri iOS builds on macOS CI
-- [ ] Basic task CRUD works on mobile (both GUIs)
+- [ ] Basic task CRUD works on mobile
 - [ ] Validates cross-platform architecture
 
 ### Distribution
