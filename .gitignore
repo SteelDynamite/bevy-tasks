@@ -19,6 +19,9 @@ build/
 *~
 *.iml
 
+# Dart
+.dart_tool/
+
 # OS
 .DS_Store
 Thumbs.db
