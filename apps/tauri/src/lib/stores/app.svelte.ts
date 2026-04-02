@@ -8,9 +8,13 @@ import type {
   SyncResult,
 } from "../types";
 
-// Listen for file system changes from the backend watcher
+// Listen for file system changes from the backend watcher.
+// Store the unlisten function so it can be cleaned up if needed.
+let _unlistenFs: (() => void) | null = null;
 listen("fs-changed", () => {
   loadLists();
+}).then((unlisten) => {
+  _unlistenFs = unlisten;
 });
 
 // ── Reactive state ───────────────────────────────────────────────────
@@ -79,7 +83,7 @@ async function addWorkspace(name: string, path: string) {
     await invoke("add_workspace", { name, path });
     config = await invoke<AppConfig>("get_config");
     await loadLists();
-    invoke("watch_workspace", { path }).catch(() => {});
+    invoke("watch_workspace", { path }).catch((e) => console.warn("File watcher failed:", e));
     screen = "tasks";
     error = null;
   } catch (e) {

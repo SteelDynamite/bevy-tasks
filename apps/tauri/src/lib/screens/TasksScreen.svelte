@@ -44,7 +44,7 @@
       showWorkspacePicker = false;
     if (showListMenu && listMenuEl && !listMenuEl.contains(e.target as Node))
       showListMenu = false;
-    var target = e.target as HTMLElement;
+    const target = e.target as HTMLElement;
     if (wsMenuName && !target.closest("[data-ws-menu]")) wsMenuName = null;
   }
 
@@ -58,6 +58,7 @@
   let listMenuEl = $state<HTMLDivElement | null>(null);
   let confirmDeleteList = $state(false);
   let confirmDeleteCompleted = $state(false);
+  let confirmRemoveWorkspace = $state<string | null>(null);
   let dragId = $state<string | null>(null);
   let dragOverId = $state<string | null>(null);
   let resizing = $state(false);
@@ -270,7 +271,7 @@
                   {#if wsMenuName === name}
                     <div class="absolute right-0 top-full z-40 mt-1 min-w-[140px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
                       <button
-                        onclick={() => { wsMenuName = null; if (confirm(`Remove workspace "${name}"? (Files remain on disk)`)) app.removeWorkspace(name); }}
+                        onclick={() => { wsMenuName = null; confirmRemoveWorkspace = name; }}
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
                       >
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -648,6 +649,18 @@
     danger
     onconfirm={executeDeleteList}
     oncancel={() => (confirmDeleteList = false)}
+  />
+{/if}
+
+<!-- Remove workspace confirmation -->
+{#if confirmRemoveWorkspace}
+  <ConfirmDialog
+    message='Remove workspace "{confirmRemoveWorkspace}"?'
+    detail="Files remain on disk."
+    confirmText="Remove"
+    danger
+    onconfirm={() => { const name = confirmRemoveWorkspace; confirmRemoveWorkspace = null; if (name) app.removeWorkspace(name); }}
+    oncancel={() => (confirmRemoveWorkspace = null)}
   />
 {/if}
 

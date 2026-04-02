@@ -34,7 +34,7 @@
 
   function debouncedSave(fields: Partial<Task>) {
     clearTimeout(saveTimer);
-    var snapshot = { ...task };
+    const snapshot = { ...task };
     saveTimer = setTimeout(() => {
       app.updateTask({ ...snapshot, ...fields, updated_at: new Date().toISOString() });
     }, 400);
