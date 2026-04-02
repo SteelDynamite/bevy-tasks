@@ -3,31 +3,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
-import 'src/rust/frb_generated.dart';
 import 'src/theme.dart';
 import 'src/state/app_state.dart';
 import 'src/screens/setup_screen.dart';
 import 'src/screens/tasks_screen.dart';
 import 'src/screens/settings_screen.dart';
 
+bool get isDesktop => !Platform.isAndroid && !Platform.isIOS;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await RustLib.init();
 
-  await windowManager.ensureInitialized();
-  await windowManager.waitUntilReadyToShow(
-    const WindowOptions(
-      size: Size(400, 700),
-      minimumSize: Size(320, 500),
-      titleBarStyle: TitleBarStyle.hidden,
-    ),
-    () async {
-      await windowManager.setBackgroundColor(Colors.transparent);
-      await windowManager.setResizable(true);
-      await windowManager.show();
-      await windowManager.focus();
-    },
-  );
+  if (isDesktop) {
+    await windowManager.ensureInitialized();
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(
+        size: Size(400, 700),
+        minimumSize: Size(320, 500),
+        titleBarStyle: TitleBarStyle.hidden,
+      ),
+      () async {
+        await windowManager.setBackgroundColor(Colors.transparent);
+        await windowManager.setResizable(true);
+        await windowManager.show();
+        await windowManager.focus();
+      },
+    );
+  }
 
   runApp(
     ChangeNotifierProvider(
@@ -108,7 +110,6 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasNativeBorder = Platform.isWindows;
 
     _onScreenChanged(state.screen);
 
@@ -132,7 +133,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                     ),
                     GestureDetector(
                       onTap: state.clearError,
-                      child: const Text('✕', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: const Text('\u2715', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -150,8 +151,16 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       ],
     );
 
+    // Mobile: simple scaffold with SafeArea
+    if (!isDesktop) {
+      return Scaffold(
+        backgroundColor: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
+        body: SafeArea(child: content),
+      );
+    }
+
+    final hasNativeBorder = Platform.isWindows;
     if (hasNativeBorder) {
-      // Windows provides native border + shadow, just fill with surface color
       return Scaffold(
         backgroundColor: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
         body: ClipRect(child: content),
@@ -212,12 +221,10 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       );
     }
     return [
-      // Corners (larger hit area)
       zone(ResizeEdge.topLeft, left: 0, top: 0, width: _edge * 2, height: _edge * 2),
       zone(ResizeEdge.topRight, left: w - _edge * 2, top: 0, width: _edge * 2, height: _edge * 2),
       zone(ResizeEdge.bottomLeft, left: 0, top: h - _edge * 2, width: _edge * 2, height: _edge * 2),
       zone(ResizeEdge.bottomRight, left: w - _edge * 2, top: h - _edge * 2, width: _edge * 2, height: _edge * 2),
-      // Edges
       zone(ResizeEdge.top, left: _edge * 2, top: 0, width: w - _edge * 4, height: _edge),
       zone(ResizeEdge.bottom, left: _edge * 2, top: h - _edge, width: w - _edge * 4, height: _edge),
       zone(ResizeEdge.left, left: 0, top: _edge * 2, width: _edge, height: h - _edge * 4),

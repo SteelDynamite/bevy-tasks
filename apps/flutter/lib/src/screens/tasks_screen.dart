@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../rust/api.dart' as api;
+import 'package:onyx_core/onyx_core.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/custom_title_bar.dart';
@@ -73,11 +73,13 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     final state = context.read<AppState>();
     final task = await state.createTask(title, desc);
     if (task != null && dueDate != null) {
-      await state.updateTask(api.TaskDto(
-        id: task.id, title: task.title, description: task.description,
-        status: task.status, dueDate: dueDate, hasTime: hasTime,
-        createdAt: task.createdAt, updatedAt: task.updatedAt, parentId: task.parentId,
-      ));
+      var due = DateTime.tryParse(dueDate);
+      if (due != null) {
+        task.dueDate = due.toUtc();
+        task.hasTime = hasTime;
+        task.updatedAt = DateTime.now().toUtc();
+        await state.updateTask(task);
+      }
     }
     _closeNewTask();
   }
@@ -478,13 +480,13 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                           shrinkWrap: true,
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           children: [
-                            for (final ws in state.config!.workspaces)
+                            for (final entry in state.config!.workspaces.entries)
                               _WorkspaceMenuItem(
-                                name: ws.name,
-                                path: ws.path,
-                                isActive: ws.name == state.config?.currentWorkspace,
+                                name: entry.key,
+                                path: entry.value.path,
+                                isActive: entry.key == state.config?.currentWorkspace,
                                 onTap: () {
-                                  state.switchWorkspace(ws.name);
+                                  state.switchWorkspace(entry.key);
                                   setState(() => _workspaceSwitcherOpen = false);
                                 },
                               ),

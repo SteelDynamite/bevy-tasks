@@ -1,56 +1,82 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import '../rust/api.dart' as api;
+import 'package:onyx_core/onyx_core.dart';
 
 class AppState extends ChangeNotifier {
   String screen = 'setup';
-  api.AppConfigDto? config;
-  List<api.TaskListDto> lists = [];
+  AppConfig? config;
+  String? _configPath;
+  TaskRepository? _repo;
+  List<TaskList> lists = [];
   String? activeListId;
-  List<api.TaskDto> tasks = [];
+  List<Task> tasks = [];
   bool darkMode = true;
   StreamSubscription? _watcherSub;
+  DateTime? _lastWrite;
   bool syncing = false;
   String syncMode = 'full';
-  api.SyncResultDto? lastSyncResult;
+  SyncResult? lastSyncResult;
   String? error;
-
-  // Selected task for detail view
   String? selectedTaskId;
 
-  api.TaskListDto? get activeList =>
-      activeListId == null ? null : lists.cast<api.TaskListDto?>().firstWhere((l) => l?.id == activeListId, orElse: () => null);
+  /// Credential store for WebDAV (injected by caller for platform flexibility).
+  CredentialStore credentialStore = EnvVarCredentialStore();
 
-  List<api.TaskDto> get pendingTasks => tasks.where((t) => t.status == 'backlog').toList();
-  List<api.TaskDto> get completedTasks => tasks.where((t) => t.status == 'completed').toList();
+  TaskList? get activeList =>
+      activeListId == null ? null : lists.cast<TaskList?>().firstWhere((l) => l?.id == activeListId, orElse: () => null);
+
+  List<Task> get pendingTasks => tasks.where((t) => t.status == TaskStatus.backlog).toList();
+  List<Task> get completedTasks => tasks.where((t) => t.status == TaskStatus.completed).toList();
 
   bool get hasWorkspace =>
       config != null && config!.currentWorkspace != null && config!.workspaces.isNotEmpty;
 
-  api.TaskDto? get selectedTask =>
-      selectedTaskId == null ? null : tasks.cast<api.TaskDto?>().firstWhere((t) => t?.id == selectedTaskId, orElse: () => null);
+  Task? get selectedTask =>
+      selectedTaskId == null ? null : tasks.cast<Task?>().firstWhere((t) => t?.id == selectedTaskId, orElse: () => null);
+
+  String _getConfigPath() {
+    _configPath ??= AppConfig.getConfigPath();
+    return _configPath!;
+  }
+
+  void setConfigPath(String path) => _configPath = path;
+
+  void _muteWatcher() {
+    _lastWrite = DateTime.now();
+  }
 
   Future<void> _startWatcher(String path) async {
     _watcherSub?.cancel();
     try {
-      final stream = await api.watchWorkspaceChanges(path: path);
-      _watcherSub = stream.listen((_) => loadLists());
+      var dir = Directory(path);
+      if (!dir.existsSync()) return;
+      Timer? debounce;
+      _watcherSub = dir.watch(recursive: true).listen((event) {
+        // Only care about .md and .json files
+        if (!event.path.endsWith('.md') && !event.path.endsWith('.json')) return;
+        // Self-change suppression
+        if (_lastWrite != null && DateTime.now().difference(_lastWrite!).inMilliseconds < 1000) return;
+        debounce?.cancel();
+        debounce = Timer(const Duration(milliseconds: 500), () => loadLists());
+      });
     } catch (_) {}
   }
 
   Future<void> loadConfig() async {
     try {
-      config = await api.getConfig();
+      config = AppConfig.loadFromFile(_getConfigPath());
       if (hasWorkspace) {
         screen = 'tasks';
+        var (_, ws) = config!.getCurrentWorkspace();
+        _repo = TaskRepository(ws.path);
         await loadLists();
-        final ws = config!.workspaces.firstWhere((w) => w.name == config!.currentWorkspace);
         _startWatcher(ws.path);
       } else {
         screen = 'setup';
       }
     } catch (e) {
-      config = const api.AppConfigDto(workspaces: [], currentWorkspace: null);
+      config = AppConfig();
       screen = 'setup';
     }
     notifyListeners();
@@ -58,9 +84,11 @@ class AppState extends ChangeNotifier {
 
   Future<void> addWorkspace(String name, String path) async {
     try {
-      await api.initWorkspace(path: path);
-      await api.addWorkspace(name: name, path: path);
-      config = await api.getConfig();
+      _repo = TaskRepository.init(path);
+      config ??= AppConfig();
+      config!.addWorkspace(name, WorkspaceConfig(path: path));
+      config!.currentWorkspace = name;
+      config!.saveToFile(_getConfigPath());
       await loadLists();
       _startWatcher(path);
       screen = 'tasks';
@@ -73,11 +101,12 @@ class AppState extends ChangeNotifier {
 
   Future<void> switchWorkspace(String name) async {
     try {
-      await api.setCurrentWorkspace(name: name);
-      config = await api.getConfig();
+      config!.setCurrentWorkspace(name);
+      config!.saveToFile(_getConfigPath());
+      var ws = config!.getWorkspace(name)!;
+      _repo = TaskRepository(ws.path);
       activeListId = null;
       await loadLists();
-      final ws = config!.workspaces.firstWhere((w) => w.name == name);
       _startWatcher(ws.path);
       error = null;
     } catch (e) {
@@ -88,13 +117,14 @@ class AppState extends ChangeNotifier {
 
   Future<void> removeWorkspace(String name) async {
     try {
-      await api.removeWorkspace(name: name);
-      config = await api.getConfig();
+      config!.removeWorkspace(name);
+      config!.saveToFile(_getConfigPath());
       if (!hasWorkspace) {
         screen = 'setup';
         lists = [];
         tasks = [];
         activeListId = null;
+        _repo = null;
       }
     } catch (e) {
       error = e.toString();
@@ -103,11 +133,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> loadLists() async {
+    if (_repo == null) return;
     try {
-      lists = await api.getLists();
-      if (lists.isNotEmpty && activeListId == null) {
+      _muteWatcher();
+      lists = _repo!.getLists();
+      if (lists.isNotEmpty && activeListId == null)
         activeListId = lists[0].id;
-      }
       if (activeListId != null) await loadTasks();
     } catch (e) {
       error = e.toString();
@@ -115,9 +146,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> loadTasks() async {
-    if (activeListId == null) return;
+    if (activeListId == null || _repo == null) return;
     try {
-      tasks = await api.listTasks(listId: activeListId!);
+      tasks = _repo!.listTasks(activeListId!);
     } catch (e) {
       error = e.toString();
     }
@@ -131,8 +162,10 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> createList(String name) async {
+    if (_repo == null) return;
     try {
-      final list = await api.createList(name: name);
+      _muteWatcher();
+      var list = _repo!.createList(name);
       lists = [...lists, list];
       activeListId = list.id;
       tasks = [];
@@ -144,16 +177,17 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> deleteList(String id) async {
+    if (_repo == null) return;
     try {
-      await api.deleteList(listId: id);
+      _muteWatcher();
+      _repo!.deleteList(id);
       lists = lists.where((l) => l.id != id).toList();
       if (activeListId == id) {
         activeListId = lists.isNotEmpty ? lists[0].id : null;
-        if (activeListId != null) {
+        if (activeListId != null)
           await loadTasks();
-        } else {
+        else
           tasks = [];
-        }
       }
     } catch (e) {
       error = e.toString();
@@ -161,10 +195,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<api.TaskDto?> createTask(String title, String description) async {
-    if (activeListId == null) return null;
+  Future<Task?> createTask(String title, String description) async {
+    if (activeListId == null || _repo == null) return null;
     try {
-      final task = await api.createTask(listId: activeListId!, title: title, description: description);
+      _muteWatcher();
+      var task = Task.create(title).withDescription(description);
+      _repo!.createTask(activeListId!, task);
       tasks = [...tasks, task];
       error = null;
       notifyListeners();
@@ -177,16 +213,22 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> toggleTask(String taskId) async {
-    if (activeListId == null) return;
+    if (activeListId == null || _repo == null) return;
     try {
-      final updated = await api.toggleTask(listId: activeListId!, taskId: taskId);
-      if (updated.status == 'backlog') {
-        tasks = [updated, ...tasks.where((t) => t.id != taskId)];
+      _muteWatcher();
+      var task = _repo!.getTask(activeListId!, taskId);
+      if (task.status == TaskStatus.completed)
+        task.uncomplete();
+      else
+        task.complete();
+      _repo!.updateTask(activeListId!, task);
+      if (task.status == TaskStatus.backlog) {
+        tasks = [task, ...tasks.where((t) => t.id != taskId)];
         try {
-          await api.reorderTask(listId: activeListId!, taskId: taskId, newPosition: 0);
+          _repo!.reorderTask(activeListId!, taskId, 0);
         } catch (_) {}
       } else {
-        tasks = tasks.map((t) => t.id == taskId ? updated : t).toList();
+        tasks = tasks.map((t) => t.id == taskId ? task : t).toList();
       }
     } catch (e) {
       error = e.toString();
@@ -194,10 +236,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateTask(api.TaskDto task) async {
-    if (activeListId == null) return;
+  Future<void> updateTask(Task task) async {
+    if (activeListId == null || _repo == null) return;
     try {
-      await api.updateTask(listId: activeListId!, task: task);
+      _muteWatcher();
+      _repo!.updateTask(activeListId!, task);
       tasks = tasks.map((t) => t.id == task.id ? task : t).toList();
     } catch (e) {
       error = e.toString();
@@ -206,9 +249,10 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> reorderTask(String taskId, int newPosition) async {
-    if (activeListId == null) return;
+    if (activeListId == null || _repo == null) return;
     try {
-      await api.reorderTask(listId: activeListId!, taskId: taskId, newPosition: newPosition);
+      _muteWatcher();
+      _repo!.reorderTask(activeListId!, taskId, newPosition);
       await loadTasks();
     } catch (e) {
       error = e.toString();
@@ -217,9 +261,10 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> moveTask(String taskId, String targetListId) async {
-    if (activeListId == null) return;
+    if (activeListId == null || _repo == null) return;
     try {
-      await api.moveTask(fromListId: activeListId!, toListId: targetListId, taskId: taskId);
+      _muteWatcher();
+      _repo!.moveTask(activeListId!, targetListId, taskId);
       tasks = tasks.where((t) => t.id != taskId).toList();
       if (selectedTaskId == taskId) selectedTaskId = null;
     } catch (e) {
@@ -229,9 +274,11 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> renameList(String listId, String newName) async {
+    if (_repo == null) return;
     try {
-      await api.renameList(listId: listId, newName: newName);
-      await loadLists();
+      _muteWatcher();
+      _repo!.renameList(listId, newName);
+      lists = _repo!.getLists();
     } catch (e) {
       error = e.toString();
     }
@@ -239,9 +286,11 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> setGroupByDueDate(String listId, bool enabled) async {
+    if (_repo == null) return;
     try {
-      await api.setGroupByDueDate(listId: listId, enabled: enabled);
-      await loadLists();
+      _muteWatcher();
+      _repo!.setGroupByDueDate(listId, enabled);
+      lists = _repo!.getLists();
       if (listId == activeListId) await loadTasks();
     } catch (e) {
       error = e.toString();
@@ -250,9 +299,10 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> deleteTask(String taskId) async {
-    if (activeListId == null) return;
+    if (activeListId == null || _repo == null) return;
     try {
-      await api.deleteTask(listId: activeListId!, taskId: taskId);
+      _muteWatcher();
+      _repo!.deleteTask(activeListId!, taskId);
       tasks = tasks.where((t) => t.id != taskId).toList();
       if (selectedTaskId == taskId) selectedTaskId = null;
     } catch (e) {
@@ -273,8 +323,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> triggerSync() async {
     if (config?.currentWorkspace == null) return;
-    final wsName = config!.currentWorkspace!;
-    final ws = config!.workspaces.firstWhere((w) => w.name == wsName);
+    var (wsName, ws) = config!.getCurrentWorkspace();
     if (ws.webdavUrl == null) {
       error = 'No WebDAV URL configured';
       notifyListeners();
@@ -284,25 +333,46 @@ class AppState extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final domain = Uri.parse(ws.webdavUrl!).host;
-      final creds = await api.loadCredentials(domain: domain);
-      final result = await api.syncWorkspaceCmd(
-        workspaceName: wsName,
+      var domain = Uri.parse(ws.webdavUrl!).host;
+      var creds = credentialStore.loadCredentials(domain);
+      if (creds == null) throw CredentialError('No credentials found for $domain');
+      var mode = switch (syncMode) {
+        'push' => SyncMode.push,
+        'pull' => SyncMode.pull,
+        _ => SyncMode.full,
+      };
+      var result = await syncWorkspace(
         workspacePath: ws.path,
         webdavUrl: ws.webdavUrl!,
-        username: creds[0],
-        password: creds[1],
-        mode: syncMode,
+        username: creds.$1,
+        password: creds.$2,
+        mode: mode,
       );
       lastSyncResult = result;
       if (result.errors.isNotEmpty) error = result.errors.join('; ');
-      config = await api.getConfig();
-      await loadLists();
+      ws.lastSync = DateTime.now().toUtc();
+      config!.saveToFile(_getConfigPath());
+      _repo = TaskRepository(ws.path);
+      lists = _repo!.getLists();
     } catch (e) {
       error = e.toString();
     }
     syncing = false;
     notifyListeners();
+  }
+
+  /// Save WebDAV config for the current workspace.
+  void setWebdavConfig(String webdavUrl) {
+    if (config?.currentWorkspace == null) return;
+    var (_, ws) = config!.getCurrentWorkspace();
+    ws.webdavUrl = webdavUrl;
+    config!.saveToFile(_getConfigPath());
+  }
+
+  /// Test WebDAV connection.
+  Future<void> testWebdavConnection(String url, String username, String password) async {
+    var client = WebDavClient(url, username, password);
+    await client.testConnection();
   }
 
   void toggleDarkMode() {

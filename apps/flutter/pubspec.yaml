@@ -9,11 +9,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_rust_bridge: 2.11.1
+  onyx_core:
+    path: ../../packages/onyx_core
   provider: ^6.1.0
   window_manager: ^0.4.0
   file_picker: ^8.0.0
   google_fonts: ^6.0.0
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:

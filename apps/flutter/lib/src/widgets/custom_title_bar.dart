@@ -1,6 +1,9 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../theme.dart';
+
+bool get _isDesktop => !Platform.isAndroid && !Platform.isIOS;
 
 class CustomTitleBar extends StatelessWidget {
   final Widget? leading;
@@ -15,7 +18,7 @@ class CustomTitleBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
-      onPanStart: (_) => windowManager.startDragging(),
+      onPanStart: (_) { if (_isDesktop) windowManager.startDragging(); },
       child: Container(
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -49,7 +52,7 @@ class CustomTitleBar extends StatelessWidget {
             else
               const Expanded(child: SizedBox.shrink()),
             if (actions != null) ...actions!,
-            if (showClose) ...[
+            if (showClose && _isDesktop) ...[
               const SizedBox(width: 4),
               _TitleBarButton(
                 icon: Icons.close,

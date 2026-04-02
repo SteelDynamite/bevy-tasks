@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../rust/api.dart' as api;
+import 'package:onyx_core/onyx_core.dart';
 import '../theme.dart';
 
 class TaskItem extends StatefulWidget {
-  final api.TaskDto task;
+  final Task task;
   final VoidCallback onToggle;
   final VoidCallback onTap;
 
@@ -17,22 +17,21 @@ class _TaskItemState extends State<TaskItem> {
   bool _hovering = false;
   double _swipeOffset = 0;
 
-  String _formatDueDate(String isoDate) {
-    final date = DateTime.tryParse(isoDate);
-    if (date == null) return '';
+  String _formatDueDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final taskDate = DateTime(date.year, date.month, date.day);
+    final local = date.toLocal();
+    final taskDate = DateTime(local.year, local.month, local.day);
     final diff = taskDate.difference(today).inDays;
     if (diff == 0) return 'Today';
     if (diff == 1) return 'Tomorrow';
-    return date.toLocal().toIso8601String().substring(5, 10).replaceAll('-', '/');
+    return local.toIso8601String().substring(5, 10).replaceAll('-', '/');
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isCompleted = widget.task.status == 'completed';
+    final isCompleted = widget.task.status == TaskStatus.completed;
     final canSwipeLeft = !isCompleted;
     final canSwipeRight = isCompleted;
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../rust/api.dart' as api;
+import 'package:onyx_core/onyx_core.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 
@@ -35,17 +35,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final state = context.read<AppState>();
     final wsName = state.config?.currentWorkspace;
     if (wsName == null) return;
-    final ws = state.config!.workspaces.cast<api.WorkspaceEntry?>().firstWhere(
-      (w) => w?.name == wsName, orElse: () => null);
+    final ws = state.config!.getWorkspace(wsName);
     if (ws?.webdavUrl != null) {
       _urlController.text = ws!.webdavUrl!;
       try {
         final domain = Uri.parse(ws.webdavUrl!).host;
-        final creds = await api.loadCredentials(domain: domain);
-        if (mounted) {
+        final creds = state.credentialStore.loadCredentials(domain);
+        if (creds != null && mounted) {
           setState(() {
-            _userController.text = creds[0];
-            _passController.text = creds[1];
+            _userController.text = creds.$1;
+            _passController.text = creds.$2;
           });
         }
       } catch (_) {}
@@ -55,10 +54,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _testConnection() async {
     setState(() => _testStatus = 'testing');
     try {
-      await api.testWebdavConnection(
-        url: _urlController.text,
-        username: _userController.text,
-        password: _passController.text,
+      final state = context.read<AppState>();
+      await state.testWebdavConnection(
+        _urlController.text,
+        _userController.text,
+        _passController.text,
       );
       if (mounted) setState(() => _testStatus = 'ok');
     } catch (_) {
@@ -70,16 +70,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final state = context.read<AppState>();
     final wsName = state.config?.currentWorkspace;
     if (wsName == null || _urlController.text.trim().isEmpty) return;
-    await api.setWebdavConfig(
-      workspaceName: wsName,
-      webdavUrl: _urlController.text.trim(),
-    );
+    state.setWebdavConfig(_urlController.text.trim());
     if (_userController.text.isNotEmpty && _passController.text.isNotEmpty) {
       final domain = Uri.parse(_urlController.text.trim()).host;
-      await api.storeCredentials(
-        domain: domain,
-        username: _userController.text,
-        password: _passController.text,
+      state.credentialStore.storeCredentials(
+        domain,
+        _userController.text,
+        _passController.text,
       );
     }
     await state.loadConfig();
@@ -108,14 +105,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     final wsName = state.config?.currentWorkspace;
-    final ws = wsName == null ? null : state.config!.workspaces.cast<api.WorkspaceEntry?>()
-        .firstWhere((w) => w?.name == wsName, orElse: () => null);
+    final ws = wsName == null ? null : state.config!.getWorkspace(wsName);
     final lastSync = ws?.lastSync;
     String? relTime;
     if (lastSync != null) {
-      final t = DateTime.tryParse(lastSync);
-      if (t != null) {
-        final secsAgo = DateTime.now().difference(t).inSeconds;
+      {
+        final secsAgo = DateTime.now().difference(lastSync).inSeconds;
         if (secsAgo < 60) {
           relTime = 'just now';
         } else if (secsAgo < 3600) {
@@ -354,7 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         const SizedBox(height: 32),
                         Center(
-                          child: Text('Flutter + Rust',
+                          child: Text('Flutter + Dart',
                             style: TextStyle(fontSize: 12,
                               color: (isDark ? AppTheme.textDark : AppTheme.textLight).withValues(alpha: 0.3))),
                         ),

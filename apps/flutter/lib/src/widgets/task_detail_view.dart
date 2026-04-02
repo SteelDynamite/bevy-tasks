@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import '../rust/api.dart' as api;
+import 'package:onyx_core/onyx_core.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import 'package:provider/provider.dart';
 import 'date_time_picker.dart';
 
 class TaskDetailView extends StatefulWidget {
-  final api.TaskDto task;
+  final Task task;
 
   const TaskDetailView({super.key, required this.task});
 
@@ -55,36 +56,38 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
     super.dispose();
   }
 
-  void _scheduleUpdate({String? dueDate, bool? hasTime}) {
+  void _scheduleUpdate({DateTime? dueDate, bool? hasTime, bool clearDue = false}) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () {
       final state = context.read<AppState>();
-      state.updateTask(api.TaskDto(
-        id: widget.task.id,
+      var t = widget.task;
+      state.updateTask(Task(
+        id: t.id,
         title: _titleController.text,
         description: _descController.text,
-        status: widget.task.status,
-        dueDate: dueDate ?? widget.task.dueDate,
-        hasTime: hasTime ?? widget.task.hasTime,
-        createdAt: widget.task.createdAt,
-        updatedAt: widget.task.updatedAt,
-        parentId: widget.task.parentId,
+        status: t.status,
+        dueDate: clearDue ? null : (dueDate ?? t.dueDate),
+        hasTime: hasTime ?? t.hasTime,
+        createdAt: t.createdAt,
+        updatedAt: DateTime.now().toUtc(),
+        parentId: t.parentId,
       ));
     });
   }
 
-  void _updateDueDate(String? dueDate, {bool hasTime = false}) {
+  void _updateDueDate(DateTime? dueDate, {bool hasTime = false}) {
     final state = context.read<AppState>();
-    state.updateTask(api.TaskDto(
-      id: widget.task.id,
+    var t = widget.task;
+    state.updateTask(Task(
+      id: t.id,
       title: _titleController.text,
       description: _descController.text,
-      status: widget.task.status,
+      status: t.status,
       dueDate: dueDate,
       hasTime: hasTime,
-      createdAt: widget.task.createdAt,
-      updatedAt: widget.task.updatedAt,
-      parentId: widget.task.parentId,
+      createdAt: t.createdAt,
+      updatedAt: DateTime.now().toUtc(),
+      parentId: t.parentId,
     ));
   }
 
@@ -97,17 +100,15 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) => DateTimePicker(
-        initialDate: widget.task.dueDate != null ? DateTime.tryParse(widget.task.dueDate!) : null,
+        initialDate: widget.task.dueDate,
         initialHasTime: widget.task.hasTime,
-        onDone: (date, hasTime) => _updateDueDate(date.toUtc().toIso8601String(), hasTime: hasTime),
+        onDone: (date, hasTime) => _updateDueDate(date.toUtc(), hasTime: hasTime),
         onClear: () => _updateDueDate(null),
       ),
     );
   }
 
-  String _formatDateChip(String iso) {
-    final d = DateTime.tryParse(iso);
-    if (d == null) return iso;
+  String _formatDateChip(DateTime d) {
     final local = d.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -157,12 +158,12 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final state = context.read<AppState>();
-    final isCompleted = widget.task.status == 'completed';
+    final isCompleted = widget.task.status == TaskStatus.completed;
     return Column(
       children: [
         // Header (just back button, matching Tauri)
         GestureDetector(
-          onPanStart: (_) => windowManager.startDragging(),
+          onPanStart: (_) { if (!Platform.isAndroid && !Platform.isIOS) windowManager.startDragging(); },
           child: Container(
             height: 44,
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -261,6 +262,7 @@ class _TaskDetailViewState extends State<TaskDetailView> with SingleTickerProvid
                                   onTap: _editDate,
                                   child: Text(
                                     _formatDateChip(widget.task.dueDate!),
+
                                     style: const TextStyle(fontSize: 14),
                                   ),
                                 ),
