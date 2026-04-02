@@ -9,12 +9,8 @@ import type {
 } from "../types";
 
 // Listen for file system changes from the backend watcher.
-// Store the unlisten function so it can be cleaned up if needed.
-let _unlistenFs: (() => void) | null = null;
 listen("fs-changed", () => {
   loadLists();
-}).then((unlisten) => {
-  _unlistenFs = unlisten;
 });
 
 // ── Reactive state ───────────────────────────────────────────────────
@@ -98,7 +94,7 @@ async function switchWorkspace(name: string) {
     activeListId = null;
     await loadLists();
     const ws = config?.workspaces[name];
-    if (ws) invoke("watch_workspace", { path: ws.path }).catch(() => {});
+    if (ws) invoke("watch_workspace", { path: ws.path }).catch((e) => console.warn("File watcher failed:", e));
     error = null;
   } catch (e) {
     error = String(e);
@@ -200,7 +196,7 @@ async function toggleTask(taskId: string) {
     // Move to top of list locally, then persist order in background
     if (updated.status === "backlog") {
       tasks = [updated, ...tasks.filter((t) => t.id !== taskId)];
-      invoke("reorder_task", { listId: activeListId, taskId, newPosition: 0 }).catch(() => {});
+      invoke("reorder_task", { listId: activeListId, taskId, newPosition: 0 }).catch((e) => { error = String(e); });
     } else {
       tasks = tasks.map((t) => (t.id === taskId ? updated : t));
     }

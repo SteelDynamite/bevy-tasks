@@ -19,6 +19,7 @@
 
   let isCompleted = $derived(task.status === "completed");
   let justChecked = $state(false);
+  let toggling = $state(false);
 
   $effect(() => {
     const _ = task.status;
@@ -35,6 +36,8 @@
 
   async function handleToggle(e: MouseEvent) {
     e.stopPropagation();
+    if (toggling) return;
+    toggling = true;
     justChecked = true;
     await new Promise((r) => setTimeout(r, 300));
     transitioning = true;
@@ -42,6 +45,7 @@
     await new Promise((r) => setTimeout(r, 200));
     justChecked = false;
     await app.toggleTask(task.id);
+    toggling = false;
   }
 
   function handleTouchStart(e: TouchEvent) {
@@ -57,14 +61,15 @@
   }
 
   function handleTouchEnd() {
-    if (Math.abs(swipeX) > 100) {
+    if (Math.abs(swipeX) > 100 && !toggling) {
       swipeX = 0;
       swiping = false;
+      toggling = true;
       justChecked = true;
       setTimeout(() => {
         transitioning = true;
         animateInIds.add(task.id);
-        setTimeout(() => { justChecked = false; app.toggleTask(task.id); }, 200);
+        setTimeout(() => { justChecked = false; app.toggleTask(task.id).finally(() => { toggling = false; }); }, 200);
       }, 300);
       return;
     }
