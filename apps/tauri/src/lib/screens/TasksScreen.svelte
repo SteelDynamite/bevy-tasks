@@ -46,6 +46,7 @@
   let wsMenuName = $state<string | null>(null);
   let renamingListId = $state<string | null>(null);
   let renameValue = $state("");
+  let expandedTasks = $state(new Set<string>());
   let dragId = $state<string | null>(null);
   let dragOverId = $state<string | null>(null);
   let resizing = $state(false);
@@ -481,8 +482,33 @@
                 ondrop={(e) => handleDrop(e, task.id)}
                 class="{dragId === task.id ? 'opacity-30' : ''} {dragOverId === task.id && dragId !== task.id ? 'border-t-2 border-t-primary' : ''}"
               >
-                <TaskItem {task} onopen={openTask} />
+                {#if app.getSubtasks(task.id).length > 0}
+                  <!-- Parent with subtasks: show expand/collapse toggle -->
+                  <div class="flex items-center">
+                    <button
+                      onclick={(e) => { e.stopPropagation(); expandedTasks.has(task.id) ? expandedTasks.delete(task.id) : expandedTasks.add(task.id); expandedTasks = new Set(expandedTasks); }}
+                      class="flex h-full shrink-0 items-center pl-2 pr-0 py-3 opacity-40 hover:opacity-70"
+                    >
+                      <svg class="h-3.5 w-3.5 transition-transform {expandedTasks.has(task.id) ? 'rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" />
+                      </svg>
+                    </button>
+                    <div class="min-w-0 flex-1">
+                      <TaskItem {task} onopen={openTask} />
+                    </div>
+                  </div>
+                {:else}
+                  <TaskItem {task} onopen={openTask} />
+                {/if}
               </div>
+              <!-- Render subtasks if expanded -->
+              {#if expandedTasks.has(task.id)}
+                {#each app.getSubtasks(task.id) as subtask (subtask.id)}
+                  <div class="border-l-2 border-border-light ml-4 dark:border-border-dark">
+                    <TaskItem task={subtask} onopen={openTask} depth={1} />
+                  </div>
+                {/each}
+              {/if}
             {/each}
 
             {#if app.pendingTasks.length === 0}
@@ -519,6 +545,11 @@
                 <div class="transition-all duration-300 ease-out {showCompleted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}">
                   {#each app.completedTasks as task (task.id)}
                     <TaskItem {task} onopen={openTask} />
+                    {#each app.getSubtasks(task.id).filter(s => s.status === "completed") as subtask (subtask.id)}
+                      <div class="border-l-2 border-border-light ml-4 dark:border-border-dark">
+                        <TaskItem task={subtask} onopen={openTask} depth={1} />
+                      </div>
+                    {/each}
                   {/each}
                 </div>
               {/if}
