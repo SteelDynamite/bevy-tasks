@@ -82,9 +82,9 @@ impl AppConfig {
     }
 
     pub fn get_config_path() -> PathBuf {
-        let config_dir = directories::ProjectDirs::from("", "", "onyx")
-            .expect("Failed to determine config directory");
-        config_dir.config_dir().join("config.json")
+        directories::ProjectDirs::from("", "", "onyx")
+            .map(|dirs| dirs.config_dir().join("config.json"))
+            .unwrap_or_else(|| PathBuf::from("onyx-config.json"))
     }
 }
 

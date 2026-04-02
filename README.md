@@ -198,7 +198,7 @@ cargo test -- --nocapture
 
 ## What's Next?
 
-- **Phase 4**: Mobile support (iOS & Android via Tauri v2)
+- **Phase 4**: Mobile support (iOS & Android via Tauri v2 mobile)
 - **Phase 5**: GUI advanced features (subtasks, search, date picker)
 - **Phase 6**: Mobile polish and platform-specific integrations
 - **Phase 7**: Google Tasks importer and unique features

@@ -149,8 +149,25 @@ impl FileSystemStorage {
         Err(Error::ListNotFound(list_id.to_string()))
     }
 
-    fn list_dir_path_by_name(&self, name: &str) -> PathBuf {
-        self.root_path.join(name)
+    fn list_dir_path_by_name(&self, name: &str) -> Result<PathBuf> {
+        // Reject names containing path separators or traversal components
+        if name.contains('/') || name.contains('\\') || name == ".." || name.starts_with("../") || name.starts_with("..\\") {
+            return Err(Error::InvalidData("Invalid list name: path traversal not allowed".to_string()));
+        }
+        let path = self.root_path.join(name);
+        // Verify resolved path stays within root
+        let canonical_root = self.root_path.canonicalize()
+            .map_err(Error::Io)?;
+        let canonical_path = if path.exists() {
+            path.canonicalize().map_err(Error::Io)?
+        } else {
+            // Parent must exist and be canonicalizable (it's root_path)
+            canonical_root.join(path.file_name().unwrap_or_default())
+        };
+        if !canonical_path.starts_with(&canonical_root) {
+            return Err(Error::InvalidData("Invalid list name: path escapes workspace".to_string()));
+        }
+        Ok(path)
     }
 
     fn sanitize_filename(name: &str) -> String {
@@ -371,7 +388,7 @@ impl Storage for FileSystemStorage {
     }
 
     fn create_list(&mut self, name: String) -> Result<TaskList> {
-        let list_dir = self.list_dir_path_by_name(&name);
+        let list_dir = self.list_dir_path_by_name(&name)?;
 
         if list_dir.exists() {
             return Err(Error::InvalidData(format!("List '{}' already exists", name)));
@@ -473,7 +490,7 @@ impl Storage for FileSystemStorage {
 
     fn rename_list(&mut self, list_id: Uuid, new_name: String) -> Result<()> {
         let old_dir = self.list_dir_path(list_id)?;
-        let new_dir = self.list_dir_path_by_name(&new_name);
+        let new_dir = self.list_dir_path_by_name(&new_name)?;
 
         if new_dir.exists() {
             return Err(Error::InvalidData(format!("A list named '{}' already exists", new_name)));

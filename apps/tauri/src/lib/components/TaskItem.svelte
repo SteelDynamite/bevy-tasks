@@ -19,6 +19,7 @@
 
   let isCompleted = $derived(task.status === "completed");
   let justChecked = $state(false);
+  let toggling = $state(false);
 
   $effect(() => {
     const _ = task.status;
@@ -35,6 +36,8 @@
 
   async function handleToggle(e: MouseEvent) {
     e.stopPropagation();
+    if (toggling) return;
+    toggling = true;
     justChecked = true;
     await new Promise((r) => setTimeout(r, 300));
     transitioning = true;
@@ -42,6 +45,7 @@
     await new Promise((r) => setTimeout(r, 200));
     justChecked = false;
     await app.toggleTask(task.id);
+    toggling = false;
   }
 
   function handleTouchStart(e: TouchEvent) {
@@ -57,14 +61,15 @@
   }
 
   function handleTouchEnd() {
-    if (Math.abs(swipeX) > 100) {
+    if (Math.abs(swipeX) > 100 && !toggling) {
       swipeX = 0;
       swiping = false;
+      toggling = true;
       justChecked = true;
       setTimeout(() => {
         transitioning = true;
         animateInIds.add(task.id);
-        setTimeout(() => { justChecked = false; app.toggleTask(task.id); }, 200);
+        setTimeout(() => { justChecked = false; app.toggleTask(task.id).finally(() => { toggling = false; }); }, 200);
       }, 300);
       return;
     }
@@ -106,15 +111,16 @@
   {/if}
 
   <!-- Task content -->
-  <button
-    class="group flex w-full items-start gap-3 bg-surface-light py-3 pr-4 text-left hover:bg-black/5 dark:bg-surface-dark dark:hover:bg-white/5"
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="group flex w-full cursor-pointer items-start gap-3 bg-surface-light py-3 pr-4 text-left hover:bg-black/5 dark:bg-surface-dark dark:hover:bg-white/5"
     style="padding-left: {1 + depth * 1.5}rem; transform: translateX({swipeX}px); transition: {swiping ? 'none' : 'transform 0.2s ease-out'}"
     onclick={() => onopen?.(task)}
   >
     <!-- Checkbox -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
+    <button
       onclick={handleToggle}
+      aria-label={isCompleted ? "Restore task" : "Complete task"}
       class="-m-2 flex shrink-0 items-center justify-center p-2"
     >
       <div
@@ -131,7 +137,7 @@
         </svg>
       {/if}
       </div>
-    </div>
+    </button>
 
     <!-- Content -->
     <div class="min-w-0 flex-1">
@@ -160,7 +166,7 @@
     <svg class="mt-1 h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-30" viewBox="0 0 20 20" fill="currentColor">
       <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" />
     </svg>
-  </button>
+  </div>
 </div>
 </div>
 </div>

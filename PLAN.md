@@ -768,7 +768,11 @@ All Android work can be done locally on Linux. iOS must go through CI or a Mac.
 
 ---
 
-### Known Blockers
+### Tauri GUI
+
+Tauri v2 has mobile support but it's newer and less mature.
+
+#### Known Blockers
 
 **`notify` crate doesn't compile for mobile.** The file-watcher subsystem (`notify` + `notify-debouncer-mini` in `Cargo.toml`) does not support Android or iOS targets. The entire file-watcher initialization path must be gated behind `#[cfg(not(mobile))]` before cross-compilation will succeed.
 
@@ -852,17 +856,17 @@ npm run tauri ios build
 #### Desktop & Mobile
 - [x] Multiple task lists (folders)
 - [x] Switch between lists
-- [ ] Subtasks support
-- [ ] Due dates with date picker
+- [x] Subtasks support
+- [x] Due dates with date picker
 - [ ] Rich markdown editor for task notes
-- [ ] Move tasks between lists
+- [x] Move tasks between lists
 - [ ] Change storage folder location in settings
 - [ ] Search functionality
 - [x] Theme selection (light/dark mode)
 
 #### Desktop-Specific
 - [x] Drag & drop reordering
-- [ ] Keyboard shortcuts
+- [x] Keyboard shortcuts
 - [ ] Multiple windows (optional)
 
 #### Mobile-Specific

@@ -75,7 +75,11 @@ impl TaskRepository {
     pub fn move_task(&mut self, from_list_id: Uuid, to_list_id: Uuid, task_id: Uuid) -> Result<()> {
         let task = self.storage.read_task(from_list_id, task_id)?;
         self.storage.write_task(to_list_id, &task)?;
-        self.storage.delete_task(from_list_id, task_id)?;
+        // If delete from source fails, roll back by removing the copy from destination
+        if let Err(e) = self.storage.delete_task(from_list_id, task_id) {
+            let _ = self.storage.delete_task(to_list_id, task_id);
+            return Err(e);
+        }
         Ok(())
     }
 

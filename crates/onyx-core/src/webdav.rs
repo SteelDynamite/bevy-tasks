@@ -1,4 +1,5 @@
 use reqwest::Client;
+use zeroize::Zeroize;
 use crate::error::{Error, Result};
 
 /// Information about a file on the remote WebDAV server.
@@ -16,6 +17,13 @@ pub struct WebDavClient {
     _base_url: String,
     _username: String,
     _password: String,
+}
+
+impl Drop for WebDavClient {
+    fn drop(&mut self) {
+        self._password.zeroize();
+        self._username.zeroize();
+    }
 }
 
 impl WebDavClient {

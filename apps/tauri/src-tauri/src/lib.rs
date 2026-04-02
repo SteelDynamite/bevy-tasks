@@ -34,6 +34,11 @@ struct AppState {
     repo: Option<TaskRepository>,
 }
 
+/// Lock the AppState mutex, converting poisoned locks into an error string.
+fn lock_state(state: &Mutex<AppState>) -> Result<std::sync::MutexGuard<'_, AppState>, String> {
+    state.lock().map_err(|e| format!("State lock poisoned: {}", e))
+}
+
 /// Serializable sync result for the frontend.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct SyncResult {
@@ -61,7 +66,9 @@ impl From<CoreSyncResult> for SyncResult {
 /// Suppress file watcher events for the next second (call before writes).
 #[cfg(not(target_os = "android"))]
 fn mute_watcher(_state: &mut AppState) {
-    *LAST_WRITE.lock().unwrap() = Some(Instant::now());
+    if let Ok(mut t) = LAST_WRITE.lock() {
+        *t = Some(Instant::now());
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -81,17 +88,27 @@ fn ensure_repo(state: &mut AppState) -> Result<(), String> {
     Ok(())
 }
 
+/// Get an immutable reference to the repo, returning an error if not initialized.
+fn repo_ref(state: &AppState) -> Result<&TaskRepository, String> {
+    state.repo.as_ref().ok_or_else(|| "Repository not initialized".to_string())
+}
+
+/// Get a mutable reference to the repo, returning an error if not initialized.
+fn repo_mut(state: &mut AppState) -> Result<&mut TaskRepository, String> {
+    state.repo.as_mut().ok_or_else(|| "Repository not initialized".to_string())
+}
+
 // ── Config commands ──────────────────────────────────────────────────
 
 #[tauri::command]
 fn get_config(state: State<'_, Mutex<AppState>>) -> Result<AppConfig, String> {
-    let s = state.lock().unwrap();
+    let s = lock_state(&state)?;
     Ok(s.config.clone())
 }
 
 #[tauri::command]
 fn save_config(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
-    let s = state.lock().unwrap();
+    let s = lock_state(&state)?;
     s.config.save_to_file(&s.config_path).map_err(|e| e.to_string())
 }
 
@@ -101,7 +118,7 @@ fn add_workspace(
     path: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     let ws = WorkspaceConfig::new(PathBuf::from(&path));
     s.config.add_workspace(name.clone(), ws);
     s.config
@@ -119,7 +136,7 @@ fn set_current_workspace(
     name: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     s.config
         .set_current_workspace(name)
         .map_err(|e| e.to_string())?;
@@ -134,7 +151,7 @@ fn remove_workspace(
     name: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     s.config.remove_workspace(&name);
     s.repo = None;
     s.config
@@ -155,11 +172,9 @@ fn init_workspace(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn get_lists(state: State<'_, Mutex<AppState>>) -> Result<Vec<TaskList>, String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
-    s.repo
-        .as_ref()
-        .unwrap()
+    repo_ref(&s)?
         .get_lists()
         .map_err(|e| e.to_string())
 }
@@ -169,12 +184,10 @@ fn create_list(
     name: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<TaskList, String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .create_list(name)
         .map_err(|e| e.to_string())
 }
@@ -184,13 +197,11 @@ fn delete_list(
     list_id: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .delete_list(id)
         .map_err(|e| e.to_string())
 }
@@ -202,12 +213,10 @@ fn list_tasks(
     list_id: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<Vec<Task>, String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_ref()
-        .unwrap()
+    repo_ref(&s)?
         .list_tasks(id)
         .map_err(|e| e.to_string())
 }
@@ -220,7 +229,7 @@ fn create_task(
     parent_id: Option<String>,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<Task, String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
@@ -232,9 +241,7 @@ fn create_task(
         let parent_uuid = Uuid::parse_str(&pid).map_err(|e| e.to_string())?;
         task.parent_id = Some(parent_uuid);
     }
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .create_task(id, task)
         .map_err(|e| e.to_string())
 }
@@ -245,13 +252,11 @@ fn update_task(
     task: Task,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .update_task(id, task)
         .map_err(|e| e.to_string())
 }
@@ -262,12 +267,12 @@ fn delete_task(
     task_id: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    let repo = s.repo.as_mut().unwrap();
+    let repo = repo_mut(&mut s)?;
     // Cascade-delete subtasks first
     let all_tasks = repo.list_tasks(lid).map_err(|e| e.to_string())?;
     let child_ids: Vec<Uuid> = all_tasks
@@ -276,7 +281,7 @@ fn delete_task(
         .map(|t| t.id)
         .collect();
     for child_id in child_ids {
-        let _ = repo.delete_task(lid, child_id);
+        repo.delete_task(lid, child_id).map_err(|e| format!("Failed to delete subtask {}: {}", child_id, e))?;
     }
     repo.delete_task(lid, tid)
         .map_err(|e| e.to_string())
@@ -288,12 +293,12 @@ fn toggle_task(
     task_id: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<Task, String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    let repo = s.repo.as_mut().unwrap();
+    let repo = repo_mut(&mut s)?;
     let mut task = repo.get_task(lid, tid).map_err(|e| e.to_string())?;
     match task.status {
         TaskStatus::Backlog => task.complete(),
@@ -322,14 +327,12 @@ fn reorder_task(
     new_position: usize,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .reorder_task(lid, tid, new_position)
         .map_err(|e| e.to_string())
 }
@@ -343,15 +346,13 @@ fn move_task(
     task_id: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let from = Uuid::parse_str(&from_list_id).map_err(|e| e.to_string())?;
     let to = Uuid::parse_str(&to_list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .move_task(from, to, tid)
         .map_err(|e| e.to_string())
 }
@@ -362,13 +363,11 @@ fn rename_list(
     new_name: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .rename_list(id, new_name)
         .map_err(|e| e.to_string())
 }
@@ -379,13 +378,11 @@ fn set_group_by_due_date(
     enabled: bool,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .set_group_by_due_date(id, enabled)
         .map_err(|e| e.to_string())
 }
@@ -395,12 +392,10 @@ fn get_group_by_due_date(
     list_id: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<bool, String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_ref()
-        .unwrap()
+    repo_ref(&s)?
         .get_group_by_due_date(id)
         .map_err(|e| e.to_string())
 }
@@ -413,7 +408,7 @@ fn set_webdav_config(
     webdav_url: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
+    let mut s = lock_state(&state)?;
     if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
         ws.webdav_url = Some(webdav_url);
     }
@@ -477,7 +472,7 @@ async fn sync_workspace(
 
     // Persist last_sync timestamp to config
     {
-        let mut s = state.lock().unwrap();
+        let mut s = lock_state(&state)?;
         if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
             ws.last_sync = Some(Utc::now());
         }
@@ -491,6 +486,10 @@ async fn sync_workspace(
 
 #[cfg(not(target_os = "android"))]
 fn start_watcher(handle: tauri::AppHandle, path: PathBuf) {
+    // Stop any existing watcher before starting a new one
+    if let Ok(mut w) = WATCHER.lock() {
+        *w = None;
+    }
     let handle = handle.clone();
     let debouncer = new_debouncer(
         std::time::Duration::from_millis(500),
@@ -504,16 +503,22 @@ fn start_watcher(handle: tauri::AppHandle, path: PathBuf) {
             });
             if !has_data_change { return; }
             // Skip if we wrote recently (self-change suppression)
-            if let Some(t) = *LAST_WRITE.lock().unwrap() {
-                if t.elapsed() < std::time::Duration::from_secs(1) { return; }
+            if let Ok(guard) = LAST_WRITE.lock() {
+                if let Some(t) = *guard {
+                    if t.elapsed() < std::time::Duration::from_secs(1) { return; }
+                }
             }
             let _ = handle.emit("fs-changed", ());
         },
     );
     match debouncer {
         Ok(mut d) => {
-            let _ = d.watcher().watch(&path, notify::RecursiveMode::Recursive);
-            *WATCHER.lock().unwrap() = Some(d);
+            if let Err(e) = d.watcher().watch(&path, notify::RecursiveMode::Recursive) {
+                eprintln!("Failed to watch path {}: {e}", path.display());
+            }
+            if let Ok(mut w) = WATCHER.lock() {
+                *w = Some(d);
+            }
         }
         Err(e) => eprintln!("Failed to start file watcher: {e}"),
     }
@@ -545,7 +550,9 @@ pub fn run() {
                 #[cfg(target_os = "android")]
                 {
                     use tauri::Manager;
-                    app.path().app_data_dir().expect("Failed to get app data dir").join("config.json")
+                    app.path().app_data_dir()
+                        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+                        .join("config.json")
                 }
                 #[cfg(not(target_os = "android"))]
                 {
