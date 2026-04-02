@@ -129,7 +129,8 @@ pub fn compute_sync_actions(
             // Both present, base known: check for changes
             (Some(l), Some(r), Some(b)) => {
                 let local_changed = l.checksum != b.checksum;
-                let remote_changed = r.size != b.size || r.last_modified.as_deref() != b.modified_at.as_deref();
+                // Compare remote vs base using parsed timestamps to avoid format mismatches
+                let remote_changed = r.size != b.size || !timestamps_equal(r.last_modified.as_deref(), b.modified_at.as_deref());
 
                 match (local_changed, remote_changed) {
                     (false, false) => {} // Skip, unchanged
@@ -173,7 +174,7 @@ pub fn compute_sync_actions(
 
             // Remote present, local gone, base known: local was deleted
             (None, Some(_), Some(b)) => {
-                let remote_changed = remote.is_some_and(|r| r.size != b.size || r.last_modified.as_deref() != b.modified_at.as_deref());
+                let remote_changed = remote.is_some_and(|r| r.size != b.size || !timestamps_equal(r.last_modified.as_deref(), b.modified_at.as_deref()));
                 if remote_changed {
                     // deleted locally + modified remotely -> download (remote wins)
                     actions.push(SyncAction::Download { path: path.to_string() });
@@ -195,6 +196,23 @@ pub fn compute_sync_actions(
     // Sort actions for deterministic output
     actions.sort_by(|a, b| a.path().cmp(b.path()));
     actions
+}
+
+/// Compare two timestamps for equality by parsing both, tolerating format differences.
+fn timestamps_equal(a: Option<&str>, b: Option<&str>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(a), Some(b)) => {
+            // Try string equality first (fast path)
+            if a == b { return true; }
+            // Parse both and compare as DateTime
+            match (parse_timestamp(a), parse_timestamp(b)) {
+                (Some(ta), Some(tb)) => ta == tb,
+                _ => false,
+            }
+        }
+        _ => false,
+    }
 }
 
 /// Determine if local wins based on timestamps. True means local wins.
@@ -582,12 +600,11 @@ async fn execute_action(
     report: &(dyn Fn(&str) + Send + Sync),
 ) -> Result<()> {
     match action {
-        SyncAction::Upload { path } | SyncAction::ConflictLocalWins { path } => {
+        SyncAction::Upload { path } => {
             let local_path = workspace_path.join(path.replace('/', std::path::MAIN_SEPARATOR_STR));
             let data = std::fs::read(&local_path)?;
             let checksum = compute_checksum(&data);
 
-            // Ensure remote parent directory exists
             if let Some(parent) = path_parent(path) {
                 client.ensure_dir(parent).await?;
             }
@@ -602,7 +619,25 @@ async fn execute_action(
             sync_state.record_file(path, &checksum, modified.as_deref(), data.len() as u64);
         }
 
-        SyncAction::Download { path } | SyncAction::ConflictRemoteWins { path } => {
+        SyncAction::ConflictLocalWins { path } => {
+            let local_path = workspace_path.join(path.replace('/', std::path::MAIN_SEPARATOR_STR));
+            let data = std::fs::read(&local_path)?;
+            let checksum = compute_checksum(&data);
+
+            if let Some(parent) = path_parent(path) {
+                client.ensure_dir(parent).await?;
+            }
+
+            report(&format!("  ^ Conflict: uploading local version of {}", path));
+            client.put_file(path, data.clone()).await?;
+
+            let modified = std::fs::metadata(&local_path).ok()
+                .and_then(|m| m.modified().ok())
+                .map(|t| { let dt: DateTime<Utc> = t.into(); dt.to_rfc3339() });
+            sync_state.record_file(path, &checksum, modified.as_deref(), data.len() as u64);
+        }
+
+        SyncAction::Download { path } => {
             report(&format!("  v Downloading {}", path));
             let data = client.get_file(path).await?;
             let checksum = compute_checksum(&data);
@@ -614,6 +649,29 @@ async fn execute_action(
             std::fs::write(&local_path, &data)?;
 
             // Record in sync state
+            let modified = std::fs::metadata(&local_path).ok()
+                .and_then(|m| m.modified().ok())
+                .map(|t| { let dt: DateTime<Utc> = t.into(); dt.to_rfc3339() });
+            sync_state.record_file(path, &checksum, modified.as_deref(), data.len() as u64);
+        }
+
+        SyncAction::ConflictRemoteWins { path } => {
+            let local_path = workspace_path.join(path.replace('/', std::path::MAIN_SEPARATOR_STR));
+            // Back up local version before overwriting with remote
+            if local_path.exists() {
+                let backup_path = local_path.with_extension("conflict-backup");
+                let _ = std::fs::copy(&local_path, &backup_path);
+                report(&format!("  ! Backed up local version to {}", backup_path.display()));
+            }
+            report(&format!("  v Conflict: downloading remote version of {}", path));
+            let data = client.get_file(path).await?;
+            let checksum = compute_checksum(&data);
+
+            if let Some(parent) = local_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&local_path, &data)?;
+
             let modified = std::fs::metadata(&local_path).ok()
                 .and_then(|m| m.modified().ok())
                 .map(|t| { let dt: DateTime<Utc> = t.into(); dt.to_rfc3339() });
