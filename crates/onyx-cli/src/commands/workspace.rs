@@ -168,33 +168,59 @@ pub fn migrate(name: String, new_path: String) -> Result<()> {
         return Ok(());
     }
 
+    // Validate destination
+    if old_path == new_path_buf {
+        anyhow::bail!("Source and destination paths are the same");
+    }
+    if new_path_buf.exists() && new_path_buf.read_dir()?.next().is_some() {
+        anyhow::bail!("Destination directory '{}' already contains files", new_path_buf.display());
+    }
+
     // Create destination directory
     std::fs::create_dir_all(&new_path_buf)?;
 
-    // Move files
+    // Move files, tracking what was moved for rollback
     output::info("Moving files...");
-    let entries = std::fs::read_dir(&old_path)?;
-    let mut count = 0;
+    let entries: Vec<_> = std::fs::read_dir(&old_path)?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let mut moved: Vec<(std::path::PathBuf, std::path::PathBuf)> = Vec::new();
 
-    for entry in entries {
-        let entry = entry?;
-        let file_name = entry.file_name();
-        let dest = new_path_buf.join(&file_name);
+    let move_result: Result<()> = (|| {
+        for entry in &entries {
+            let file_name = entry.file_name();
+            let dest = new_path_buf.join(&file_name);
 
-        if entry.path().is_dir() {
-            let mut options = fs_extra::dir::CopyOptions::new();
-            options.copy_inside = true;
-            fs_extra::dir::move_dir(entry.path(), &new_path_buf, &options)?;
-            output::item(&format!("Moved {}/", file_name.to_string_lossy()));
-        } else {
-            std::fs::rename(entry.path(), dest)?;
+            if entry.path().is_dir() {
+                let mut options = fs_extra::dir::CopyOptions::new();
+                options.copy_inside = true;
+                fs_extra::dir::move_dir(entry.path(), &new_path_buf, &options)?;
+            } else {
+                std::fs::rename(entry.path(), &dest)?;
+            }
+            moved.push((entry.path(), dest));
             output::item(&format!("Moved {}", file_name.to_string_lossy()));
         }
-        count += 1;
+        Ok(())
+    })();
+
+    if let Err(e) = move_result {
+        output::error(&format!("Migration failed: {}. Rolling back...", e));
+        for (src, dest) in moved.into_iter().rev() {
+            if dest.exists() {
+                if dest.is_dir() {
+                    let mut options = fs_extra::dir::CopyOptions::new();
+                    options.copy_inside = true;
+                    let _ = fs_extra::dir::move_dir(&dest, &old_path, &options);
+                } else {
+                    let _ = std::fs::rename(&dest, &src);
+                }
+            }
+        }
+        anyhow::bail!("Migration failed and was rolled back: {}", e);
     }
 
     // Remove old directory if empty
-    if old_path.read_dir()?.next().is_none() {
+    if old_path.exists() && old_path.read_dir()?.next().is_none() {
         std::fs::remove_dir(&old_path)?;
     }
 
@@ -202,7 +228,7 @@ pub fn migrate(name: String, new_path: String) -> Result<()> {
     config.add_workspace(name.clone(), WorkspaceConfig::new(new_path_buf.clone()));
     save_config(&config)?;
 
-    output::success(&format!("Migrated {} items to {}", count, new_path_buf.display()));
+    output::success(&format!("Migrated {} items to {}", moved.len(), new_path_buf.display()));
     output::success(&format!("Workspace \"{}\" now points to {}", name, new_path_buf.display()));
 
     Ok(())

@@ -150,27 +150,22 @@ impl FileSystemStorage {
     }
 
     fn list_dir_path_by_name(&self, name: &str) -> Result<PathBuf> {
+        // Reject names containing path separators or traversal components
+        if name.contains('/') || name.contains('\\') || name == ".." || name.starts_with("../") || name.starts_with("..\\") {
+            return Err(Error::InvalidData("Invalid list name: path traversal not allowed".to_string()));
+        }
         let path = self.root_path.join(name);
-        // Prevent path traversal: resolved path must stay within root
+        // Verify resolved path stays within root
         let canonical_root = self.root_path.canonicalize()
-            .unwrap_or_else(|_| self.root_path.clone());
+            .map_err(Error::Io)?;
         let canonical_path = if path.exists() {
-            path.canonicalize().unwrap_or_else(|_| path.clone())
+            path.canonicalize().map_err(Error::Io)?
         } else {
-            // For non-existent paths, normalize by resolving the parent
-            if let Some(parent) = path.parent() {
-                let canonical_parent = if parent.exists() {
-                    parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf())
-                } else {
-                    parent.to_path_buf()
-                };
-                canonical_parent.join(path.file_name().unwrap_or_default())
-            } else {
-                path.clone()
-            }
+            // Parent must exist and be canonicalizable (it's root_path)
+            canonical_root.join(path.file_name().unwrap_or_default())
         };
         if !canonical_path.starts_with(&canonical_root) {
-            return Err(Error::InvalidData(format!("Invalid list name: path escapes workspace")));
+            return Err(Error::InvalidData("Invalid list name: path escapes workspace".to_string()));
         }
         Ok(path)
     }
