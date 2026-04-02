@@ -768,7 +768,11 @@ All Android work can be done locally on Linux. iOS must go through CI or a Mac.
 
 ---
 
-### Known Blockers
+### Tauri GUI
+
+Tauri v2 has mobile support but it's newer and less mature.
+
+#### Known Blockers
 
 **`notify` crate doesn't compile for mobile.** The file-watcher subsystem (`notify` + `notify-debouncer-mini` in `Cargo.toml`) does not support Android or iOS targets. The entire file-watcher initialization path must be gated behind `#[cfg(not(mobile))]` before cross-compilation will succeed.
 
