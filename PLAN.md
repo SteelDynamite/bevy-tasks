@@ -724,7 +724,7 @@ WorkspaceConfig {
 - [x] Sync status indicators (last-sync time + upload/download counts chip in TasksScreen)
 - [x] Push/pull sync mode selection (session-only sync direction selector in SettingsScreen)
 - [x] Group-by-due-date toggle per list (checkmark toggle in list kebab menu)
-- [ ] Subtask hierarchy (data model exists, needs UI)
+- [x] Subtask hierarchy (expand/collapse, inline add, cascade toggle/delete)
 - [ ] Search/filter tasks
 - [x] Desktop packaging (Linux: AppImage + .deb; Windows/macOS not yet verified)
 - [x] File watcher (notify crate, 500ms debounce, auto-reloads UI on external file changes)
