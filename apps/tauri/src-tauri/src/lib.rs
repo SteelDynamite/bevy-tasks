@@ -88,6 +88,16 @@ fn ensure_repo(state: &mut AppState) -> Result<(), String> {
     Ok(())
 }
 
+/// Get an immutable reference to the repo, returning an error if not initialized.
+fn repo_ref(state: &AppState) -> Result<&TaskRepository, String> {
+    state.repo.as_ref().ok_or_else(|| "Repository not initialized".to_string())
+}
+
+/// Get a mutable reference to the repo, returning an error if not initialized.
+fn repo_mut(state: &mut AppState) -> Result<&mut TaskRepository, String> {
+    state.repo.as_mut().ok_or_else(|| "Repository not initialized".to_string())
+}
+
 // ── Config commands ──────────────────────────────────────────────────
 
 #[tauri::command]
@@ -164,9 +174,7 @@ fn init_workspace(path: String) -> Result<(), String> {
 fn get_lists(state: State<'_, Mutex<AppState>>) -> Result<Vec<TaskList>, String> {
     let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
-    s.repo
-        .as_ref()
-        .unwrap()
+    repo_ref(&s)?
         .get_lists()
         .map_err(|e| e.to_string())
 }
@@ -179,9 +187,7 @@ fn create_list(
     let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .create_list(name)
         .map_err(|e| e.to_string())
 }
@@ -195,9 +201,7 @@ fn delete_list(
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .delete_list(id)
         .map_err(|e| e.to_string())
 }
@@ -212,9 +216,7 @@ fn list_tasks(
     let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_ref()
-        .unwrap()
+    repo_ref(&s)?
         .list_tasks(id)
         .map_err(|e| e.to_string())
 }
@@ -239,9 +241,7 @@ fn create_task(
         let parent_uuid = Uuid::parse_str(&pid).map_err(|e| e.to_string())?;
         task.parent_id = Some(parent_uuid);
     }
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .create_task(id, task)
         .map_err(|e| e.to_string())
 }
@@ -256,9 +256,7 @@ fn update_task(
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .update_task(id, task)
         .map_err(|e| e.to_string())
 }
@@ -274,7 +272,7 @@ fn delete_task(
     mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    let repo = s.repo.as_mut().unwrap();
+    let repo = repo_mut(&mut s)?;
     // Cascade-delete subtasks first
     let all_tasks = repo.list_tasks(lid).map_err(|e| e.to_string())?;
     let child_ids: Vec<Uuid> = all_tasks
@@ -300,7 +298,7 @@ fn toggle_task(
     mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    let repo = s.repo.as_mut().unwrap();
+    let repo = repo_mut(&mut s)?;
     let mut task = repo.get_task(lid, tid).map_err(|e| e.to_string())?;
     match task.status {
         TaskStatus::Backlog => task.complete(),
@@ -334,9 +332,7 @@ fn reorder_task(
     mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .reorder_task(lid, tid, new_position)
         .map_err(|e| e.to_string())
 }
@@ -356,9 +352,7 @@ fn move_task(
     let from = Uuid::parse_str(&from_list_id).map_err(|e| e.to_string())?;
     let to = Uuid::parse_str(&to_list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .move_task(from, to, tid)
         .map_err(|e| e.to_string())
 }
@@ -373,9 +367,7 @@ fn rename_list(
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .rename_list(id, new_name)
         .map_err(|e| e.to_string())
 }
@@ -390,9 +382,7 @@ fn set_group_by_due_date(
     ensure_repo(&mut s)?;
     mute_watcher(&mut s);
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
+    repo_mut(&mut s)?
         .set_group_by_due_date(id, enabled)
         .map_err(|e| e.to_string())
 }
@@ -405,9 +395,7 @@ fn get_group_by_due_date(
     let mut s = lock_state(&state)?;
     ensure_repo(&mut s)?;
     let id = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_ref()
-        .unwrap()
+    repo_ref(&s)?
         .get_group_by_due_date(id)
         .map_err(|e| e.to_string())
 }
@@ -498,6 +486,10 @@ async fn sync_workspace(
 
 #[cfg(not(target_os = "android"))]
 fn start_watcher(handle: tauri::AppHandle, path: PathBuf) {
+    // Stop any existing watcher before starting a new one
+    if let Ok(mut w) = WATCHER.lock() {
+        *w = None;
+    }
     let handle = handle.clone();
     let debouncer = new_debouncer(
         std::time::Duration::from_millis(500),
