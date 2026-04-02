@@ -31,8 +31,25 @@ let error = $state<string | null>(null);
 // ── Derived ──────────────────────────────────────────────────────────
 
 let activeList = $derived(lists.find((l) => l.id === activeListId) ?? null);
-let pendingTasks = $derived(tasks.filter((t) => t.status === "backlog"));
-let completedTasks = $derived(tasks.filter((t) => t.status === "completed"));
+let pendingTasks = $derived(tasks.filter((t) => t.status === "backlog" && !t.parent_id));
+let completedTasks = $derived(tasks.filter((t) => t.status === "completed" && !t.parent_id));
+
+// Build a map of parent_id -> children for subtask hierarchy
+let childrenMap = $derived.by(() => {
+  const map = new Map<string, Task[]>();
+  for (const t of tasks) {
+    if (t.parent_id) {
+      const siblings = map.get(t.parent_id);
+      if (siblings) siblings.push(t);
+      else map.set(t.parent_id, [t]);
+    }
+  }
+  return map;
+});
+
+function getSubtasks(parentId: string): Task[] {
+  return childrenMap.get(parentId) ?? [];
+}
 let hasWorkspace = $derived(
   config !== null &&
     config.current_workspace !== null &&
@@ -151,13 +168,14 @@ async function deleteList(id: string) {
   }
 }
 
-async function createTask(title: string, description?: string): Promise<Task | null> {
+async function createTask(title: string, description?: string, parentId?: string): Promise<Task | null> {
   if (!activeListId) return null;
   try {
     const task = await invoke<Task>("create_task", {
       listId: activeListId,
       title,
       description: description ?? "",
+      parentId: parentId ?? null,
     });
     tasks = [...tasks, task];
     error = null;
@@ -350,6 +368,7 @@ export const app = {
   get hasWorkspace() {
     return hasWorkspace;
   },
+  getSubtasks,
   loadConfig,
   addWorkspace,
   switchWorkspace,

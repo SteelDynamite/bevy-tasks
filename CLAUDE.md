@@ -87,11 +87,11 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Desktop packaging (Linux: AppImage + .deb)
 - Flutter GUI at full parity with Tauri (WebDAV UI, has_time, sync status, sync mode)
 - Tauri desktop-only deps (notify, keyring) feature-gated for Android compilation
+- Subtask hierarchy (expand/collapse in task list, inline add in detail view, cascade toggle/delete)
 
 ### GUI features NOT yet done
 
 - Workspace retarget/migrate
-- Subtask hierarchy (data model exists, not used anywhere)
 - Search/filter tasks
 - Desktop packaging for Windows and macOS
 

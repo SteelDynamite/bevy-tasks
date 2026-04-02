@@ -6,7 +6,10 @@
   import type { Task } from "../types";
   import { app } from "../stores/app.svelte";
 
-  let { task, onopen }: { task: Task; onopen?: (task: Task) => void } = $props();
+  let { task, onopen, depth = 0 }: { task: Task; onopen?: (task: Task) => void; depth?: number } = $props();
+
+  let subtasks = $derived(app.getSubtasks(task.id));
+  let subtaskCount = $derived(subtasks.length);
 
   let touchStartX = $state(0);
   let swipeX = $state(0);
@@ -104,8 +107,8 @@
 
   <!-- Task content -->
   <button
-    class="group flex w-full items-start gap-3 bg-surface-light px-4 py-3 text-left hover:bg-black/5 dark:bg-surface-dark dark:hover:bg-white/5"
-    style="transform: translateX({swipeX}px); transition: {swiping ? 'none' : 'transform 0.2s ease-out'}"
+    class="group flex w-full items-start gap-3 bg-surface-light py-3 pr-4 text-left hover:bg-black/5 dark:bg-surface-dark dark:hover:bg-white/5"
+    style="padding-left: {1 + depth * 1.5}rem; transform: translateX({swipeX}px); transition: {swiping ? 'none' : 'transform 0.2s ease-out'}"
     onclick={() => onopen?.(task)}
   >
     <!-- Checkbox -->
@@ -141,6 +144,14 @@
       {#if task.due_date}
         <span class="mt-1 inline-block rounded-full border border-border-light px-2 py-0.5 text-xs opacity-50 dark:border-border-dark">
           {formatDate(task.due_date)}
+        </span>
+      {/if}
+      {#if subtaskCount > 0}
+        <span class="mt-1 inline-flex items-center gap-1 text-xs opacity-40">
+          <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm2 4a1 1 0 011-1h10a1 1 0 110 2H6a1 1 0 01-1-1zm2 4a1 1 0 011-1h8a1 1 0 110 2H8a1 1 0 01-1-1z" />
+          </svg>
+          {subtasks.filter(s => s.status === "completed").length}/{subtaskCount}
         </span>
       {/if}
     </div>

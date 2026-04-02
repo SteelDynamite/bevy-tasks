@@ -220,6 +220,7 @@ fn create_task(
     list_id: String,
     title: String,
     description: Option<String>,
+    parent_id: Option<String>,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<Task, String> {
     let mut s = state.lock().unwrap();
@@ -229,6 +230,10 @@ fn create_task(
     let mut task = Task::new(title);
     if let Some(desc) = description.filter(|d| !d.is_empty()) {
         task.description = desc;
+    }
+    if let Some(pid) = parent_id {
+        let parent_uuid = Uuid::parse_str(&pid).map_err(|e| e.to_string())?;
+        task.parent_id = Some(parent_uuid);
     }
     s.repo
         .as_mut()
@@ -265,10 +270,18 @@ fn delete_task(
     mute_watcher(&mut s);
     let lid = Uuid::parse_str(&list_id).map_err(|e| e.to_string())?;
     let tid = Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
-    s.repo
-        .as_mut()
-        .unwrap()
-        .delete_task(lid, tid)
+    let repo = s.repo.as_mut().unwrap();
+    // Cascade-delete subtasks first
+    let all_tasks = repo.list_tasks(lid).map_err(|e| e.to_string())?;
+    let child_ids: Vec<Uuid> = all_tasks
+        .iter()
+        .filter(|t| t.parent_id == Some(tid))
+        .map(|t| t.id)
+        .collect();
+    for child_id in child_ids {
+        let _ = repo.delete_task(lid, child_id);
+    }
+    repo.delete_task(lid, tid)
         .map_err(|e| e.to_string())
 }
 
@@ -291,6 +304,17 @@ fn toggle_task(
     }
     repo.update_task(lid, task.clone())
         .map_err(|e| e.to_string())?;
+    // Cascade: complete/uncomplete subtasks to match parent
+    let all_tasks = repo.list_tasks(lid).map_err(|e| e.to_string())?;
+    for mut child in all_tasks.into_iter().filter(|t| t.parent_id == Some(tid)) {
+        if child.status != task.status {
+            match task.status {
+                TaskStatus::Backlog => child.uncomplete(),
+                TaskStatus::Completed => child.complete(),
+            }
+            let _ = repo.update_task(lid, child);
+        }
+    }
     Ok(task)
 }
 

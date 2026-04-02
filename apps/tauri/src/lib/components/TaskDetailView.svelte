@@ -72,6 +72,16 @@
   });
 
   let isCompleted = $derived(task.status === "completed");
+  let subtasks = $derived(app.getSubtasks(task.id));
+  let addingSubtask = $state(false);
+  let subtaskTitle = $state("");
+
+  async function handleAddSubtask() {
+    if (!subtaskTitle.trim()) return;
+    await app.createTask(subtaskTitle.trim(), undefined, task.id);
+    subtaskTitle = "";
+    addingSubtask = false;
+  }
 
   function formatDateChip(iso: string): string {
     const d = new Date(iso);
@@ -169,6 +179,14 @@
       </div>
     {/if}
   </div>
+  <!-- Parent task indicator -->
+  {#if task.parent_id}
+    {@const parent = app.tasks.find(t => t.id === task.parent_id)}
+    {#if parent}
+      <p class="mb-2 text-xs opacity-40">Subtask of: {parent.title}</p>
+    {/if}
+  {/if}
+
   <!-- Title -->
   <input
     type="text"
@@ -214,6 +232,59 @@
         class="text-sm opacity-40 hover:opacity-70"
       >
         Add date/time
+      </button>
+    {/if}
+  </div>
+
+  <!-- Subtasks section -->
+  <div class="mt-6">
+    <div class="flex items-center gap-2 mb-2">
+      <svg class="h-5 w-5 shrink-0 opacity-40" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm2 4a1 1 0 011-1h10a1 1 0 110 2H6a1 1 0 01-1-1zm2 4a1 1 0 011-1h8a1 1 0 110 2H8a1 1 0 01-1-1z" />
+      </svg>
+      <span class="text-sm font-medium opacity-60">Subtasks{subtasks.length > 0 ? ` (${subtasks.filter(s => s.status === "completed").length}/${subtasks.length})` : ""}</span>
+    </div>
+    {#each subtasks as subtask (subtask.id)}
+      <button
+        onclick={() => onback()}
+        class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-black/5 dark:hover:bg-white/10"
+      >
+        <!-- Checkbox -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          onclick={(e) => { e.stopPropagation(); app.toggleTask(subtask.id); }}
+          class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 {subtask.status === 'completed' ? 'border-primary bg-primary' : 'border-gray-400 dark:border-gray-500'}"
+        >
+          {#if subtask.status === "completed"}
+            <svg class="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+            </svg>
+          {/if}
+        </div>
+        <span class="text-sm {subtask.status === 'completed' ? 'line-through opacity-50' : ''}">{subtask.title}</span>
+      </button>
+    {/each}
+    {#if addingSubtask}
+      <div class="flex items-center gap-2 px-2 py-1">
+        <div class="h-4 w-4 shrink-0 rounded-full border-2 border-gray-400 dark:border-gray-500"></div>
+        <input
+          type="text"
+          bind:value={subtaskTitle}
+          placeholder="Subtask title"
+          class="flex-1 bg-transparent text-sm outline-none placeholder:opacity-40"
+          onkeydown={(e) => { if (e.key === "Enter") handleAddSubtask(); if (e.key === "Escape") { addingSubtask = false; subtaskTitle = ""; } }}
+          autofocus
+        />
+      </div>
+    {:else}
+      <button
+        onclick={() => (addingSubtask = true)}
+        class="flex w-full items-center gap-2 px-2 py-2 text-sm text-primary opacity-60 hover:opacity-100"
+      >
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
+        </svg>
+        Add subtask
       </button>
     {/if}
   </div>
