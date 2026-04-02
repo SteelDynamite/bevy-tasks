@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Onyx is a local-first, cross-platform task management app built in Rust. Tasks are stored as markdown files with YAML frontmatter in user-selected folders. The GUI uses Tauri v2 (Svelte 5 + Tailwind CSS 4) in `apps/tauri/`.
+Onyx is a local-first, cross-platform task management app. Tasks are stored as markdown files with YAML frontmatter in user-selected folders. Two GUIs: Tauri v2 (Svelte 5 + Tailwind CSS 4) in `apps/tauri/` and Flutter (pure Dart) in `apps/flutter/`.
 
 ## Build & Test Commands
 
@@ -19,6 +19,15 @@ cargo run -p onyx-cli -- <args>  # Run CLI with arguments
 cd apps/tauri && npm install       # Install frontend dependencies
 WEBKIT_DISABLE_DMABUF_RENDERER=1 npm run tauri dev  # Run Tauri in dev mode (Wayland)
 npm run tauri build                # Build for production
+
+# Flutter GUI
+cd apps/flutter && flutter pub get # Install dependencies
+flutter run -d windows             # Run on Windows desktop
+flutter run -d linux               # Run on Linux desktop
+flutter build apk --target-platform android-arm64  # Build Android APK
+
+# Dart core library
+cd packages/onyx_core && dart pub get && dart test  # Run Dart package tests
 ```
 
 The CLI binary is named `onyx` (from the `onyx-cli` crate).
@@ -27,12 +36,13 @@ The Tauri dev server runs on port 1422 (`vite.config.ts` and `tauri.conf.json`).
 
 ## Architecture
 
-Two-crate workspace (`resolver = "2"`, edition 2021) plus a Tauri app:
+Two-crate Rust workspace (`resolver = "2"`, edition 2021) plus two GUI apps and a Dart package:
 
 - **onyx-core** — Pure Rust library. Storage trait with `FileSystemStorage` implementation, `TaskRepository` (main API), data models, config, error types. No CLI/UI dependencies.
 - **onyx-cli** — CLI frontend using clap. Commands are in `src/commands/` (init, workspace, list, task, group). Output formatting in `src/output.rs`.
-- **apps/tauri/** — Tauri v2 GUI. Svelte 5 frontend in `src/`, Rust backend in `src-tauri/` with Tauri commands that call into `onyx-core`.
-- **apps/flutter/** — Flutter GUI. Dart frontend in `lib/src/`, Rust backend in `rust/` via flutter_rust_bridge FFI into `onyx-core`.
+- **packages/onyx_core/** — Pure Dart port of onyx-core. Same on-disk format (byte-compatible). Models, storage, repository, config, WebDAV client, sync engine. 92 tests.
+- **apps/tauri/** — Tauri v2 GUI. Svelte 5 frontend in `src/`, Rust backend in `src-tauri/` with Tauri commands that call into Rust onyx-core.
+- **apps/flutter/** — Flutter GUI. Pure Dart — uses `packages/onyx_core/` directly (no Rust FFI). `window_manager` gated behind platform checks for mobile.
 
 ### Key patterns
 
@@ -56,11 +66,12 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - **Kebab menus**: Tasks, lists, and workspaces all use kebab → submenu pattern for delete.
 - **New task**: FAB button opens bottom toast sheet (outside sliding container for fixed positioning).
 
-### Current state (2026-04-01)
+### Current state (2026-04-02)
 
 - **Phase 1** (Core + CLI): Complete
 - **Phase 2** (WebDAV sync): Backend done, CLI done, GUI wired (settings auto-populates credentials)
 - **Phase 3** (GUI MVP): Complete — both Tauri and Flutter GUIs at feature parity
+- **Phase 4** (Mobile): Flutter Android APK builds (16.8MB, pure Dart).
 
 ### GUI features done
 
@@ -85,6 +96,8 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Push/pull/full sync mode selection (session-only, in settings)
 - Desktop packaging (Linux: AppImage + .deb)
 - Flutter GUI at full parity with Tauri (WebDAV UI, has_time, sync status, sync mode)
+- Flutter uses pure Dart backend (packages/onyx_core), no Rust FFI
+- Flutter Android APK builds (16.8MB, arm64)
 
 ### GUI features NOT yet done
 
