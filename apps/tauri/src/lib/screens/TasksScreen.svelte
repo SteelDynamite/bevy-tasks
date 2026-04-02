@@ -3,6 +3,7 @@
   import TaskItem from "../components/TaskItem.svelte";
   import TaskDetailView from "../components/TaskDetailView.svelte";
   import NewTaskInput, { newTaskState } from "../components/NewTaskInput.svelte";
+  import ConfirmDialog from "../components/ConfirmDialog.svelte";
   import SettingsScreen from "./SettingsScreen.svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { platform } from "@tauri-apps/plugin-os";
@@ -13,15 +14,23 @@
   const isDesktop = currentPlatform === "linux" || currentPlatform === "windows";
   const isWindows = currentPlatform === "windows";
 
-  let selectedTaskId = $state<string | null>(null);
-  let selectedTask = $derived(selectedTaskId ? app.tasks.find(t => t.id === selectedTaskId) ?? null : null);
+  let taskStack = $state<string[]>([]);
+  let parentTask = $derived(taskStack.length >= 1 ? app.tasks.find(t => t.id === taskStack[0]) ?? null : null);
+  let subtaskDetail = $derived(taskStack.length >= 2 ? app.tasks.find(t => t.id === taskStack[1]) ?? null : null);
 
   function openTask(task: Task) {
-    selectedTaskId = task.id;
+    taskStack = [task.id];
+  }
+
+  function pushTask(task: Task) {
+    taskStack = [...taskStack, task.id];
   }
 
   function closeDetail() {
-    selectedTaskId = null;
+    if (taskStack.length > 1)
+      taskStack = taskStack.slice(0, -1);
+    else
+      taskStack = [];
   }
 
   let showDrawer = $state(false);
@@ -31,22 +40,24 @@
   let workspacePickerEl = $state<HTMLDivElement | null>(null);
 
   function handleWindowClick(e: MouseEvent) {
-    if (showWorkspacePicker && workspacePickerEl && !workspacePickerEl.contains(e.target as Node)) {
+    if (showWorkspacePicker && workspacePickerEl && !workspacePickerEl.contains(e.target as Node))
       showWorkspacePicker = false;
-    }
-    const target = e.target as HTMLElement;
-    if (listMenuId && !target.closest("[data-list-menu]")) listMenuId = null;
+    if (showListMenu && listMenuEl && !listMenuEl.contains(e.target as Node))
+      showListMenu = false;
+    var target = e.target as HTMLElement;
     if (wsMenuName && !target.closest("[data-ws-menu]")) wsMenuName = null;
   }
 
   let newListName = $state("");
   let showCompleted = $state(false);
   let completedVisible = $state(false);
-  let listMenuId = $state<string | null>(null);
   let wsMenuName = $state<string | null>(null);
   let renamingListId = $state<string | null>(null);
   let renameValue = $state("");
-  let expandedTasks = $state(new Set<string>());
+  let showListMenu = $state(false);
+  let listMenuEl = $state<HTMLDivElement | null>(null);
+  let confirmDeleteList = $state(false);
+  let confirmDeleteCompleted = $state(false);
   let dragId = $state<string | null>(null);
   let dragOverId = $state<string | null>(null);
   let resizing = $state(false);
@@ -73,43 +84,57 @@
     showNewList = false;
   }
 
-  async function handleDeleteList(id: string) {
-    listMenuId = null;
-    const list = app.lists.find(l => l.id === id);
-    if (!confirm(`Delete list "${list?.title ?? id}" and all its tasks?`)) return;
-    await app.deleteList(id);
+  function promptDeleteCompleted() {
+    showListMenu = false;
+    confirmDeleteCompleted = true;
   }
 
-  function startRenameList(id: string) {
-    listMenuId = null;
-    const list = app.lists.find(l => l.id === id);
+  async function executeDeleteCompleted() {
+    confirmDeleteCompleted = false;
+    for (var t of app.completedTasks) await app.deleteTask(t.id);
+  }
+
+  function promptDeleteList() {
+    showListMenu = false;
+    confirmDeleteList = true;
+  }
+
+  async function executeDeleteList() {
+    confirmDeleteList = false;
+    if (app.activeListId) await app.deleteList(app.activeListId);
+  }
+
+  function startRenameList() {
+    showListMenu = false;
+    if (!app.activeListId) return;
+    var list = app.lists.find(l => l.id === app.activeListId);
     if (!list) return;
-    renamingListId = id;
+    renamingListId = app.activeListId;
     renameValue = list.title;
   }
 
   async function handleRenameList() {
     if (!renamingListId || !renameValue.trim()) { renamingListId = null; return; }
-    const list = app.lists.find(l => l.id === renamingListId);
-    if (renameValue.trim() !== list?.title) {
+    var list = app.lists.find(l => l.id === renamingListId);
+    if (renameValue.trim() !== list?.title)
       await app.renameList(renamingListId, renameValue.trim());
-    }
     renamingListId = null;
   }
 
-  async function handleToggleGroupByDueDate(id: string) {
-    listMenuId = null;
-    const list = app.lists.find(l => l.id === id);
+  async function handleToggleGroupByDueDate() {
+    showListMenu = false;
+    if (!app.activeListId) return;
+    var list = app.lists.find(l => l.id === app.activeListId);
     if (!list) return;
-    await app.setGroupByDueDate(id, !list.group_by_due_date);
+    await app.setGroupByDueDate(app.activeListId, !list.group_by_due_date);
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key !== "Escape") return;
     if (showSettings) { showSettings = false; return; }
-    if (selectedTaskId) { selectedTaskId = null; return; }
+    if (taskStack.length > 0) { closeDetail(); return; }
+    if (showListMenu) { showListMenu = false; return; }
     if (showDrawer) { closeDrawer(); return; }
-    if (listMenuId) { listMenuId = null; return; }
     if (wsMenuName) { wsMenuName = null; return; }
     if (showWorkspacePicker) { showWorkspacePicker = false; return; }
   }
@@ -164,7 +189,6 @@
   function closeDrawer() {
     showDrawer = false;
     showNewList = false;
-    listMenuId = null;
   }
 
   function openSettings() {
@@ -276,78 +300,20 @@
     <!-- List items + new list button -->
     <div class="flex-1 overflow-y-auto py-2">
       {#each app.lists as list (list.id)}
-        <div class="group relative flex items-center px-2 hover:bg-black/5 dark:hover:bg-white/10">
-          {#if renamingListId === list.id}
-            <div class="flex flex-1 items-center px-3 py-1">
-              <input
-                type="text"
-                bind:value={renameValue}
-                class="w-full rounded border border-primary bg-transparent px-2 py-1.5 text-sm outline-none"
-                onkeydown={(e) => { if (e.key === "Enter") handleRenameList(); if (e.key === "Escape") renamingListId = null; }}
-                onblur={handleRenameList}
-                autofocus
-              />
-            </div>
-          {:else}
-            <button
-              onclick={() => { app.selectList(list.id); closeDrawer(); }}
-              class="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm {list.id === app.activeListId ? 'font-bold' : ''}"
-            >
-              {#if list.id === app.activeListId}
-                <svg class="h-4 w-4 shrink-0 opacity-50" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                </svg>
-              {/if}
-              <span>{list.title}</span>
-            </button>
+        <button
+          onclick={() => { app.selectList(list.id); closeDrawer(); }}
+          class="group flex w-full items-center gap-2 px-5 py-2.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 {list.id === app.activeListId ? 'font-bold' : ''}"
+        >
+          {#if list.id === app.activeListId}
+            <svg class="h-4 w-4 shrink-0 opacity-50" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+            </svg>
           {/if}
-          <div class="relative shrink-0" data-list-menu>
-            <button
-              onclick={() => (listMenuId = listMenuId === list.id ? null : list.id)}
-              class="rounded p-1 opacity-0 transition-opacity group-hover:opacity-40 hover:!opacity-80 {listMenuId === list.id ? '!opacity-80' : ''}"
-            >
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-              </svg>
-            </button>
-            {#if listMenuId === list.id}
-              <div class="absolute right-0 top-full z-40 mt-1 min-w-[180px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
-                <button
-                  onclick={() => startRenameList(list.id)}
-                  class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
-                >
-                  <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                  Rename
-                </button>
-                <button
-                  onclick={() => handleToggleGroupByDueDate(list.id)}
-                  class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
-                >
-                  <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
-                  </svg>
-                  Group by due date
-                  {#if list.group_by_due_date}
-                    <svg class="ml-auto h-4 w-4 text-primary" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                    </svg>
-                  {/if}
-                </button>
-                <button
-                  onclick={() => handleDeleteList(list.id)}
-                  class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
-                >
-                  <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                  </svg>
-                  Delete
-                </button>
-              </div>
-            {/if}
-          </div>
-        </div>
+          <span class="flex-1">{list.title}</span>
+          <svg class="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-30" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" />
+          </svg>
+        </button>
       {/each}
 
       <!-- New list inline -->
@@ -410,10 +376,10 @@
     <!-- Sliding inner: task list + detail view -->
     <div
       class="flex h-full {resizing ? '' : 'transition-transform duration-250'} ease-out"
-      style="width: 200%; transform: translateX({selectedTask ? '-50%' : '0'})"
+      style="width: 300%; transform: translateX({taskStack.length === 0 ? '0' : taskStack.length === 1 ? '-33.333%' : '-66.666%'})"
     >
       <!-- Sub-panel: Task list -->
-      <div class="relative flex h-full w-1/2 flex-col">
+      <div class="relative flex h-full w-1/3 flex-col">
         <!-- Header / drag region -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <header
@@ -423,21 +389,18 @@
           <!-- Drawer toggle (left) -->
           <button
             onclick={() => (showDrawer = !showDrawer)}
-            class="absolute left-2 rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
+            class="rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
           >
             <svg class="h-5 w-5 opacity-60" viewBox="0 0 20 20" fill="currentColor">
               <path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
             </svg>
           </button>
 
-          <!-- Centered title -->
-          <div class="flex-1 text-center">
-            <p class="text-sm font-semibold leading-tight">{app.activeList?.title ?? "Tasks"}</p>
-          </div>
+          <div class="flex-1"></div>
 
           <!-- Window controls (right) -->
           {#if isDesktop}
-            <div class="absolute right-1.5 flex items-center gap-0.5">
+            <div class="flex items-center gap-0.5">
               {#if isWindows}
                 <button
                   onclick={() => appWindow.minimize()}
@@ -459,6 +422,82 @@
             </div>
           {/if}
         </header>
+
+        <!-- List name + kebab (below header bar, like task detail) -->
+        <div class="relative px-4 pt-3 pb-2">
+          {#if app.activeListId}
+            <!-- Kebab menu -->
+            <div class="absolute right-3 top-1" bind:this={listMenuEl}>
+              <button
+                onclick={() => (showListMenu = !showListMenu)}
+                class="rounded-lg p-1.5 opacity-50 hover:bg-black/5 hover:opacity-80 dark:hover:bg-white/10"
+              >
+                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+              {#if showListMenu}
+                <div class="absolute right-0 top-full z-40 mt-1 min-w-[200px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+                  <button
+                    onclick={startRenameList}
+                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                    Rename
+                  </button>
+                  <button
+                    onclick={handleToggleGroupByDueDate}
+                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+                    </svg>
+                    Group by due date
+                    {#if app.activeList?.group_by_due_date}
+                      <svg class="ml-auto h-4 w-4 text-primary" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                      </svg>
+                    {/if}
+                  </button>
+                  {#if app.completedTasks.length > 0}
+                    <button
+                      onclick={promptDeleteCompleted}
+                      class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
+                    >
+                      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                      </svg>
+                      Delete completed
+                    </button>
+                  {/if}
+                  <button
+                    onclick={promptDeleteList}
+                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    Delete list
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+          {#if renamingListId === app.activeListId}
+            <input
+              type="text"
+              bind:value={renameValue}
+              class="w-full bg-transparent text-xl font-bold outline-none"
+              onkeydown={(e) => { if (e.key === "Enter") handleRenameList(); if (e.key === "Escape") renamingListId = null; }}
+              onblur={handleRenameList}
+              autofocus
+            />
+          {:else}
+            <p class="text-xl font-bold">{app.activeList?.title ?? "Tasks"}</p>
+          {/if}
+        </div>
 
         <!-- Task list -->
         <main class="flex-1 overflow-y-auto">
@@ -482,33 +521,8 @@
                 ondrop={(e) => handleDrop(e, task.id)}
                 class="{dragId === task.id ? 'opacity-30' : ''} {dragOverId === task.id && dragId !== task.id ? 'border-t-2 border-t-primary' : ''}"
               >
-                {#if app.getSubtasks(task.id).length > 0}
-                  <!-- Parent with subtasks: show expand/collapse toggle -->
-                  <div class="flex items-center">
-                    <button
-                      onclick={(e) => { e.stopPropagation(); expandedTasks.has(task.id) ? expandedTasks.delete(task.id) : expandedTasks.add(task.id); expandedTasks = new Set(expandedTasks); }}
-                      class="flex h-full shrink-0 items-center pl-2 pr-0 py-3 opacity-40 hover:opacity-70"
-                    >
-                      <svg class="h-3.5 w-3.5 transition-transform {expandedTasks.has(task.id) ? 'rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" />
-                      </svg>
-                    </button>
-                    <div class="min-w-0 flex-1">
-                      <TaskItem {task} onopen={openTask} />
-                    </div>
-                  </div>
-                {:else}
-                  <TaskItem {task} onopen={openTask} />
-                {/if}
+                <TaskItem {task} onopen={openTask} />
               </div>
-              <!-- Render subtasks if expanded -->
-              {#if expandedTasks.has(task.id)}
-                {#each app.getSubtasks(task.id) as subtask (subtask.id)}
-                  <div class="border-l-2 border-border-light ml-4 dark:border-border-dark">
-                    <TaskItem task={subtask} onopen={openTask} depth={1} />
-                  </div>
-                {/each}
-              {/if}
             {/each}
 
             {#if app.pendingTasks.length === 0}
@@ -545,11 +559,6 @@
                 <div class="transition-all duration-300 ease-out {showCompleted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}">
                   {#each app.completedTasks as task (task.id)}
                     <TaskItem {task} onopen={openTask} />
-                    {#each app.getSubtasks(task.id).filter(s => s.status === "completed") as subtask (subtask.id)}
-                      <div class="border-l-2 border-border-light ml-4 dark:border-border-dark">
-                        <TaskItem task={subtask} onopen={openTask} depth={1} />
-                      </div>
-                    {/each}
                   {/each}
                 </div>
               {/if}
@@ -559,7 +568,7 @@
 
         <!-- FAB button -->
         <div
-          class="pointer-events-none absolute bottom-6 left-0 right-0 z-20 flex justify-center transition-all duration-250 ease-out {newTaskState.open ? 'opacity-0 scale-75' : ''} {showDrawer || selectedTask ? 'translate-y-24 opacity-0' : 'translate-y-0 opacity-100'}"
+          class="pointer-events-none absolute bottom-6 left-0 right-0 z-20 flex justify-center transition-all duration-250 ease-out {newTaskState.open ? 'opacity-0 scale-75' : ''} {showDrawer || taskStack.length > 0 ? 'translate-y-24 opacity-0' : 'translate-y-0 opacity-100'}"
         >
           <button
             onclick={() => { if (app.activeListId) newTaskState.open = true; }}
@@ -574,9 +583,20 @@
       </div>
 
       <!-- Sub-panel: Task detail -->
-      <div class="relative flex h-full w-1/2 flex-col bg-surface-light dark:bg-surface-dark">
-        {#if selectedTask}
-          <TaskDetailView task={selectedTask} onback={closeDetail} />
+      <div class="relative flex h-full w-1/3 flex-col bg-surface-light dark:bg-surface-dark">
+        {#if parentTask}
+          {#key parentTask.id}
+            <TaskDetailView task={parentTask} onback={closeDetail} onopen={pushTask} />
+          {/key}
+        {/if}
+      </div>
+
+      <!-- Sub-panel: Subtask detail -->
+      <div class="relative flex h-full w-1/3 flex-col bg-surface-light dark:bg-surface-dark">
+        {#if subtaskDetail}
+          {#key subtaskDetail.id}
+            <TaskDetailView task={subtaskDetail} onback={closeDetail} />
+          {/key}
         {/if}
       </div>
     </div>
@@ -619,3 +639,25 @@
 <div class="pointer-events-none absolute inset-0 z-50">
   <NewTaskInput />
 </div>
+
+<!-- Delete list confirmation -->
+{#if confirmDeleteList}
+  <ConfirmDialog
+    message='Delete list "{app.activeList?.title}" and all its tasks?'
+    confirmText="Delete"
+    danger
+    onconfirm={executeDeleteList}
+    oncancel={() => (confirmDeleteList = false)}
+  />
+{/if}
+
+<!-- Delete completed tasks confirmation -->
+{#if confirmDeleteCompleted}
+  <ConfirmDialog
+    message="Delete {app.completedTasks.length} completed task{app.completedTasks.length === 1 ? '' : 's'}?"
+    confirmText="Delete"
+    danger
+    onconfirm={executeDeleteCompleted}
+    oncancel={() => (confirmDeleteCompleted = false)}
+  />
+{/if}

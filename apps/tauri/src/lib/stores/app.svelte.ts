@@ -177,7 +177,7 @@ async function createTask(title: string, description?: string, parentId?: string
       description: description ?? "",
       parentId: parentId ?? null,
     });
-    tasks = [...tasks, task];
+    tasks = parentId ? [task, ...tasks] : [...tasks, task];
     error = null;
     return task;
   } catch (e) {
