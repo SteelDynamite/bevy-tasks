@@ -32,8 +32,6 @@ Two-crate workspace (`resolver = "2"`, edition 2021) plus a Tauri app:
 - **onyx-core** — Pure Rust library. Storage trait with `FileSystemStorage` implementation, `TaskRepository` (main API), data models, config, error types. No CLI/UI dependencies. `keyring` feature-gated behind `keyring-storage` (default on) for Android compatibility.
 - **onyx-cli** — CLI frontend using clap. Commands are in `src/commands/` (init, workspace, list, task, group). Output formatting in `src/output.rs`.
 - **apps/tauri/** — Tauri v2 GUI. Svelte 5 frontend in `src/`, Rust backend in `src-tauri/` with Tauri commands that call into `onyx-core`. `notify` crate feature-gated for Android.
-- **apps/flutter/** — Flutter GUI. Dart frontend in `lib/src/`, Rust backend in `rust/` via flutter_rust_bridge FFI into `onyx-core`.
-
 ### Key patterns
 
 - **Storage trait** (`storage.rs`): Strategy pattern for task persistence. `FileSystemStorage` reads/writes markdown files with YAML frontmatter and JSON metadata files.
@@ -62,7 +60,7 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 
 - **Phase 1** (Core + CLI): Complete
 - **Phase 2** (WebDAV sync): Backend done, CLI done, GUI wired (settings auto-populates credentials)
-- **Phase 3** (GUI MVP): Complete — both Tauri and Flutter GUIs at feature parity
+- **Phase 3** (GUI MVP): Complete
 - **Phase 4** (Mobile): Tauri Android cfg-gated, needs `tauri android init` + build
 
 ### GUI features done
@@ -88,7 +86,6 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Sync status indicators (last-sync time + upload/download counts chip)
 - Push/pull/full sync mode selection (session-only, in settings)
 - Desktop packaging (Linux: AppImage + .deb)
-- Flutter GUI at full parity with Tauri (WebDAV UI, has_time, sync status, sync mode)
 - Tauri desktop-only deps (notify, keyring) feature-gated for Android compilation
 - Subtask hierarchy: subtask count shown on parent tasks in list, subtask detail via three-panel slide navigation, inline add at top of subtask list (new subtasks prepend), collapsible completed subtasks section, cascade delete (parent deletion removes all subtasks with confirmation warning)
 - Custom confirmation dialogs (ConfirmDialog component replaces native confirm())

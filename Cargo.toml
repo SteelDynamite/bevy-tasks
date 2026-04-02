@@ -5,7 +5,6 @@ members = [
 ]
 exclude = [
     "apps/tauri/src-tauri",
-    "apps/flutter/rust",
 ]
 resolver = "2"
 
