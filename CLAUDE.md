@@ -48,12 +48,14 @@ Workspaces are plain folders. Each task list is a subfolder containing `.listdat
 
 The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). Key UI patterns:
 
-- **Sliding drawer**: Left panel (lists) slides with main content as one piece via `translateX`. 80vw wide.
+- **Sliding drawer**: Left panel (lists) slides with main content as one piece via `translateX`. 80vw wide. List items show checkmark for active list and chevron on hover.
+- **Three-panel slide**: Main content area is 300% wide with three panels (task list, task detail, subtask detail) that slide via `translateX` using a `taskStack` array. Stack depth 0 = list, 1 = task detail, 2 = subtask detail.
 - **Settings popup**: Floating overlay card with backdrop, not a sliding panel.
 - **Workspace switcher**: Custom drop-up menu in drawer footer (left), settings gear (right).
 - **Task animations**: Grid-rows `0fr`/`1fr` trick for smooth collapse/expand. Module-level `animateInIds` Set coordinates expand-in after toggle.
-- **Inline editing**: Click task to edit, auto-save on blur, shared `editingTaskId` across instances.
-- **Kebab menus**: Tasks, lists, and workspaces all use kebab → submenu pattern for delete.
+- **Inline editing**: Click task to edit, auto-save on blur. `debouncedSave` snapshots task before timer to prevent stale-reference errors on component destroy.
+- **Kebab menus**: Tasks and lists use kebab menus with custom `ConfirmDialog` component (not native `confirm()`). "Move to..." is inline in the menu (not a submenu) to avoid overflow.
+- **Main panel header**: Hamburger + window controls in top bar; list name (large, bold) + kebab below divider (matching task detail layout). Kebab has Rename, Group by due date, Delete completed, Delete list.
 - **New task**: FAB button opens bottom toast sheet (outside sliding container for fixed positioning).
 
 ### Current state (2026-04-01)
@@ -75,10 +77,11 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Dark mode (GNOME-style neutral grays, cyan-blue accent)
 - Completed tasks section with animated show/hide
 - Due date picker/editor (DateTimePicker in new task + task detail); `has_time: bool` field tracks whether time is set
-- Move task between lists (kebab menu → "Move to..." submenu)
-- List rename (inline input via list kebab menu)
-- Group-by-due-date toggle per list (list kebab menu)
-- Keyboard shortcuts (Escape priority chain: settings → detail → drawer → menus)
+- Move task between lists (inline list in kebab menu, no submenu)
+- List rename (inline input in main panel header via kebab)
+- Group-by-due-date toggle per list (main panel kebab)
+- Delete completed tasks (main panel kebab + subtask kebab, with confirmation dialogs)
+- Keyboard shortcuts (Escape priority chain: settings → detail → list menu → drawer → menus)
 - WebDAV setup flow (settings auto-populates URL/credentials from config + keychain)
 - File watcher (notify crate, 500ms debounce, auto-reloads on external changes)
 - Setup screen with window dragging + "Open Existing Folder" option
@@ -87,7 +90,8 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Desktop packaging (Linux: AppImage + .deb)
 - Flutter GUI at full parity with Tauri (WebDAV UI, has_time, sync status, sync mode)
 - Tauri desktop-only deps (notify, keyring) feature-gated for Android compilation
-- Subtask hierarchy (expand/collapse in task list, inline add in detail view, cascade toggle/delete)
+- Subtask hierarchy: subtask count shown on parent tasks in list, subtask detail via three-panel slide navigation, inline add at top of subtask list (new subtasks prepend), collapsible completed subtasks section, cascade delete (parent deletion removes all subtasks with confirmation warning)
+- Custom confirmation dialogs (ConfirmDialog component replaces native confirm())
 
 ### GUI features NOT yet done
 
