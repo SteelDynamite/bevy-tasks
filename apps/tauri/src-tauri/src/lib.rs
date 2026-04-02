@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use chrono::Utc;
 
+#[cfg(not(target_os = "android"))]
 use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
@@ -17,10 +18,12 @@ use onyx_core::{
     webdav,
 };
 
+#[cfg(not(target_os = "android"))]
 /// Active file watcher stored globally so it lives for the app lifetime.
 static WATCHER: Mutex<Option<notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>>> =
     Mutex::new(None);
 
+#[cfg(not(target_os = "android"))]
 /// Shared mute timestamp — set before writes, checked by the watcher.
 static LAST_WRITE: Mutex<Option<Instant>> = Mutex::new(None);
 
@@ -55,9 +58,13 @@ impl From<CoreSyncResult> for SyncResult {
 }
 
 /// Suppress file watcher events for the next second (call before writes).
+#[cfg(not(target_os = "android"))]
 fn mute_watcher(_state: &mut AppState) {
     *LAST_WRITE.lock().unwrap() = Some(Instant::now());
 }
+
+#[cfg(target_os = "android")]
+fn mute_watcher(_state: &mut AppState) {}
 
 /// Helper: get or open a TaskRepository for the current workspace.
 fn ensure_repo(state: &mut AppState) -> Result<(), String> {
@@ -463,6 +470,7 @@ async fn sync_workspace(
 
 // ── File watcher ────────────────────────────────────────────────────
 
+#[cfg(not(target_os = "android"))]
 fn start_watcher(handle: tauri::AppHandle, path: PathBuf) {
     let handle = handle.clone();
     let debouncer = new_debouncer(
@@ -492,9 +500,16 @@ fn start_watcher(handle: tauri::AppHandle, path: PathBuf) {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn watch_workspace(path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
     start_watcher(app_handle, PathBuf::from(path));
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+fn watch_workspace(_path: String, _app_handle: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
@@ -517,6 +532,7 @@ pub fn run() {
                 let s = state.lock().unwrap();
                 s.config.get_current_workspace().ok().map(|(_, ws)| ws.path.clone())
             };
+            #[cfg(not(target_os = "android"))]
             if let Some(path) = workspace_path {
                 start_watcher(handle, path);
             }

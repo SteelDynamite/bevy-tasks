@@ -379,6 +379,7 @@ fn extract_relative_path(href: &str, base_url: &str, request_path: &str) -> Stri
 
 // --- Credential Storage ---
 
+#[cfg(feature = "keyring-storage")]
 /// Store WebDAV credentials in the platform keychain.
 pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result<()> {
     let service = format!("com.onyx.webdav.{}", domain);
@@ -396,6 +397,13 @@ pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result
     Ok(())
 }
 
+#[cfg(not(feature = "keyring-storage"))]
+/// Store WebDAV credentials (not available without keyring-storage feature).
+pub fn store_credentials(_domain: &str, _username: &str, _password: &str) -> Result<()> {
+    Err(Error::Credential("Credential storage not available on this platform".into()))
+}
+
+#[cfg(feature = "keyring-storage")]
 /// Load WebDAV credentials from the platform keychain, falling back to env vars.
 pub fn load_credentials(domain: &str) -> Result<(String, String)> {
     let service = format!("com.onyx.webdav.{}", domain);
@@ -423,6 +431,23 @@ pub fn load_credentials(domain: &str) -> Result<(String, String)> {
     )))
 }
 
+#[cfg(not(feature = "keyring-storage"))]
+/// Load WebDAV credentials from env vars only (keyring not available).
+pub fn load_credentials(domain: &str) -> Result<(String, String)> {
+    if let (Ok(user), Ok(pass)) = (
+        std::env::var("ONYX_WEBDAV_USER"),
+        std::env::var("ONYX_WEBDAV_PASS"),
+    ) {
+        return Ok((user, pass));
+    }
+
+    Err(Error::Credential(format!(
+        "No credentials found for '{}'. Set ONYX_WEBDAV_USER and ONYX_WEBDAV_PASS.",
+        domain
+    )))
+}
+
+#[cfg(feature = "keyring-storage")]
 /// Delete WebDAV credentials from the platform keychain.
 pub fn delete_credentials(domain: &str) -> Result<()> {
     let service = format!("com.onyx.webdav.{}", domain);
@@ -434,6 +459,12 @@ pub fn delete_credentials(domain: &str) -> Result<()> {
         let _ = entry.delete_credential();
     }
 
+    Ok(())
+}
+
+#[cfg(not(feature = "keyring-storage"))]
+/// Delete WebDAV credentials (no-op without keyring-storage feature).
+pub fn delete_credentials(_domain: &str) -> Result<()> {
     Ok(())
 }
 
