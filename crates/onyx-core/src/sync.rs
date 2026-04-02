@@ -258,8 +258,19 @@ impl OfflineQueue {
             return Self::default();
         }
         match std::fs::read_to_string(&queue_path) {
-            Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
-            Err(_) => Self::default(),
+            Ok(content) => match serde_json::from_str(&content) {
+                Ok(queue) => queue,
+                Err(e) => {
+                    eprintln!("Warning: corrupt sync queue, backing up and resetting: {}", e);
+                    let backup = workspace_path.join(".syncqueue.json.bak");
+                    let _ = std::fs::copy(&queue_path, &backup);
+                    Self::default()
+                }
+            },
+            Err(e) => {
+                eprintln!("Warning: failed to read sync queue: {}", e);
+                Self::default()
+            }
         }
     }
 
@@ -338,12 +349,23 @@ pub fn compute_checksum(data: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Check if a filename is a syncable file (*.md, .listdata.json, .metadata.json).
+/// Check if a file is syncable: *.md files and metadata files at expected depths.
 fn is_syncable(path: &str) -> bool {
-    let filename = path.rsplit('/').next().unwrap_or(path);
-    filename.ends_with(".md")
-        || filename == ".listdata.json"
-        || filename == ".metadata.json"
+    let parts: Vec<&str> = path.split('/').collect();
+    let filename = parts.last().copied().unwrap_or(path);
+    // .metadata.json only at workspace root (depth 1)
+    if filename == ".metadata.json" {
+        return parts.len() == 1;
+    }
+    // .listdata.json only inside a list directory (depth 2)
+    if filename == ".listdata.json" {
+        return parts.len() == 2;
+    }
+    // .md files inside a list directory (depth 2)
+    if filename.ends_with(".md") {
+        return parts.len() == 2;
+    }
+    false
 }
 
 /// Scan local workspace files and compute checksums.
@@ -1009,14 +1031,20 @@ mod tests {
 
     #[test]
     fn test_is_syncable() {
-        assert!(is_syncable("file.md"));
+        // .md files must be inside a list dir (depth 2)
         assert!(is_syncable("My Tasks/Buy groceries.md"));
-        assert!(is_syncable(".listdata.json"));
+        assert!(!is_syncable("file.md")); // root-level md not valid
+        // .listdata.json inside a list dir (depth 2)
         assert!(is_syncable("My Tasks/.listdata.json"));
+        assert!(!is_syncable(".listdata.json")); // root-level not valid
+        // .metadata.json only at root (depth 1)
         assert!(is_syncable(".metadata.json"));
+        assert!(!is_syncable("My Tasks/.metadata.json")); // nested not valid
+        // Non-syncable
         assert!(!is_syncable(".syncstate.json"));
         assert!(!is_syncable("random.txt"));
         assert!(!is_syncable("image.png"));
+        assert!(!is_syncable("a/b/c/deep.md")); // too deep
     }
 
     #[test]
