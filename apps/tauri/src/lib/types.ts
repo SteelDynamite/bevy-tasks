@@ -19,10 +19,14 @@ export interface TaskList {
   group_by_due_date: boolean;
 }
 
+export type WorkspaceMode = "local" | "webdav";
+
 export interface WorkspaceConfig {
   path: string;
+  mode: WorkspaceMode;
   webdav_url: string | null;
   last_sync: string | null;
+  theme: string | null;
 }
 
 export interface AppConfig {

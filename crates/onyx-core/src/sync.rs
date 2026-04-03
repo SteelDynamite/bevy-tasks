@@ -510,7 +510,28 @@ pub async fn sync_workspace(
     mode: SyncMode,
     on_progress: Option<ProgressCallback>,
 ) -> Result<SyncResult> {
-    let client = WebDavClient::new(webdav_url, username, password);
+    // Wrap entire sync in a hard timeout — reqwest's built-in timeout
+    // doesn't reliably fire on Windows native TLS when the server is unreachable.
+    match tokio::time::timeout(
+        crate::webdav::REQUEST_TIMEOUT * 2,
+        sync_workspace_inner(workspace_path, webdav_url, username, password, mode, on_progress),
+    ).await {
+        Ok(result) => result,
+        Err(_) => Err(Error::WebDav("Sync timed out — server may be unreachable".into())),
+    }
+}
+
+async fn sync_workspace_inner(
+    workspace_path: &Path,
+    webdav_url: &str,
+    username: &str,
+    password: &str,
+    mode: SyncMode,
+    on_progress: Option<ProgressCallback>,
+) -> Result<SyncResult> {
+    // Sync into an "Onyx" subfolder so we don't scan the user's entire cloud storage
+    let sync_url = format!("{}/Onyx", webdav_url.trim_end_matches('/'));
+    let client = WebDavClient::new(&sync_url, username, password)?;
     let mut sync_state = SyncState::load(workspace_path);
     let queue = OfflineQueue::load(workspace_path);
     let mut result = SyncResult::default();
@@ -521,7 +542,8 @@ pub async fn sync_workspace(
         }
     };
 
-    // Ensure remote root exists
+    // Ensure remote Onyx folder exists (creates it on first sync)
+    client.create_dir("").await.ok();
     client.test_connection().await?;
 
     // Scan local files

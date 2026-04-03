@@ -68,3 +68,83 @@ body {
   background-color: #242424;
   color: #e5e7eb;
 }
+
+/* ── Theme overrides ─────────────────────────────────────────────── */
+
+[data-theme="light"] {
+  --color-primary: #2d87b8;
+  --color-primary-hover: #2474a0;
+  --color-surface-light: #ffffff;
+  --color-surface-dark: #ffffff;
+  --color-card-light: #f9fafb;
+  --color-card-dark: #f9fafb;
+  --color-text-light: #1f2937;
+  --color-text-dark: #1f2937;
+  --color-text-secondary-light: #6b7280;
+  --color-text-secondary-dark: #6b7280;
+  --color-border-light: #e5e7eb;
+  --color-border-dark: #e5e7eb;
+}
+
+[data-theme="dark"] {
+  --color-primary: #2d87b8;
+  --color-primary-hover: #2474a0;
+  --color-surface-light: #242424;
+  --color-surface-dark: #242424;
+  --color-card-light: #303030;
+  --color-card-dark: #303030;
+  --color-text-light: #e5e7eb;
+  --color-text-dark: #e5e7eb;
+  --color-text-secondary-light: #9ca3af;
+  --color-text-secondary-dark: #9ca3af;
+  --color-border-light: #3d3d3d;
+  --color-border-dark: #3d3d3d;
+}
+
+[data-theme="nord"] {
+  --color-primary: #88c0d0;
+  --color-primary-hover: #7ab3c3;
+  --color-surface-light: #2e3440;
+  --color-surface-dark: #2e3440;
+  --color-card-light: #3b4252;
+  --color-card-dark: #3b4252;
+  --color-text-light: #eceff4;
+  --color-text-dark: #eceff4;
+  --color-text-secondary-light: #d8dee9;
+  --color-text-secondary-dark: #d8dee9;
+  --color-border-light: #434c5e;
+  --color-border-dark: #434c5e;
+  --color-danger: #bf616a;
+}
+
+[data-theme="dracula"] {
+  --color-primary: #bd93f9;
+  --color-primary-hover: #a87ef0;
+  --color-surface-light: #282a36;
+  --color-surface-dark: #282a36;
+  --color-card-light: #343746;
+  --color-card-dark: #343746;
+  --color-text-light: #f8f8f2;
+  --color-text-dark: #f8f8f2;
+  --color-text-secondary-light: #bfbfbf;
+  --color-text-secondary-dark: #bfbfbf;
+  --color-border-light: #44475a;
+  --color-border-dark: #44475a;
+  --color-danger: #ff5555;
+}
+
+[data-theme="solarized"] {
+  --color-primary: #268bd2;
+  --color-primary-hover: #1e7ac0;
+  --color-surface-light: #002b36;
+  --color-surface-dark: #002b36;
+  --color-card-light: #073642;
+  --color-card-dark: #073642;
+  --color-text-light: #93a1a1;
+  --color-text-dark: #93a1a1;
+  --color-text-secondary-light: #657b83;
+  --color-text-secondary-dark: #657b83;
+  --color-border-light: #094959;
+  --color-border-dark: #094959;
+  --color-danger: #dc322f;
+}

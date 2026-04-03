@@ -39,7 +39,8 @@ pub fn setup(workspace_name: Option<String>) -> Result<()> {
     output::info("Testing connection...");
 
     let rt = tokio::runtime::Runtime::new().context("Failed to create async runtime")?;
-    let client = WebDavClient::new(&url, &username, &password);
+    let client = WebDavClient::new(&url, &username, &password)
+        .context("Invalid WebDAV URL")?;
 
     match rt.block_on(client.test_connection()) {
         Ok(()) => {

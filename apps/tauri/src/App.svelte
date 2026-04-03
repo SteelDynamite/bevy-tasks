@@ -12,7 +12,7 @@
   });
 </script>
 
-<div class={app.darkMode ? "dark" : ""}>
+<div class={app.isDark ? "dark" : ""} data-theme={app.currentTheme ?? ""}>
   <div class="h-screen w-screen" class:p-2={isLinux}>
     <div
       class="relative h-full w-full overflow-hidden bg-surface-light text-text-light dark:bg-surface-dark dark:text-text-dark"
@@ -30,7 +30,7 @@
       {/if}
 
       {#if app.screen === "setup"}
-        <SetupScreen />
+        <SetupScreen cancellable={app.hasWorkspace} />
       {:else}
         <TasksScreen />
       {/if}
