@@ -282,30 +282,17 @@ async function setGroupByDueDate(listId: string, enabled: boolean) {
 
 async function triggerSync() {
   if (!config?.current_workspace) return;
-  const workspaceName = config.current_workspace;
-  const ws = config.workspaces[workspaceName];
-  if (!ws?.webdav_url) {
-    error = "No WebDAV URL configured";
-    return;
-  }
   syncing = true;
   error = null;
   try {
-    const domain = new URL(ws.webdav_url).hostname;
-    const [username, password] = await invoke<[string, string]>("load_credentials", { domain });
     const result = await invoke<SyncResult>("sync_workspace", {
-      workspaceName,
-      workspacePath: ws.path,
-      webdavUrl: ws.webdav_url,
-      username,
-      password,
+      workspaceName: config.current_workspace,
       mode: syncMode,
     });
     lastSyncResult = result;
     if (result.errors.length > 0) {
       error = result.errors.join("; ");
     }
-    // Reload config to pick up updated last_sync timestamp
     config = await invoke<AppConfig>("get_config");
     await loadLists();
   } catch (e) {

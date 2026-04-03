@@ -138,6 +138,9 @@
           {app.syncing ? "Syncing..." : "Sync Now"}
         </button>
       </div>
+      {#if app.error}
+        <p class="mt-1.5 text-xs text-danger">{app.error}</p>
+      {/if}
       {#if ws?.last_sync}
         {@const lastSync = new Date(ws.last_sync)}
         {@const secsAgo = Math.floor((Date.now() - lastSync.getTime()) / 1000)}

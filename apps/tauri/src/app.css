@@ -71,6 +71,21 @@ body {
 
 /* ── Theme overrides ─────────────────────────────────────────────── */
 
+[data-theme="light"] {
+  --color-primary: #2d87b8;
+  --color-primary-hover: #2474a0;
+  --color-surface-light: #ffffff;
+  --color-surface-dark: #ffffff;
+  --color-card-light: #f9fafb;
+  --color-card-dark: #f9fafb;
+  --color-text-light: #1f2937;
+  --color-text-dark: #1f2937;
+  --color-text-secondary-light: #6b7280;
+  --color-text-secondary-dark: #6b7280;
+  --color-border-light: #e5e7eb;
+  --color-border-dark: #e5e7eb;
+}
+
 [data-theme="dark"] {
   --color-primary: #2d87b8;
   --color-primary-hover: #2474a0;
