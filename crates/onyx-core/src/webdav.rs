@@ -1,5 +1,5 @@
 use reqwest::Client;
-use zeroize::Zeroize;
+use zeroize::Zeroizing;
 use crate::error::{Error, Result};
 
 /// Information about a file on the remote WebDAV server.
@@ -11,29 +11,34 @@ pub struct RemoteFileInfo {
     pub last_modified: Option<String>,
 }
 
-/// WebDAV client wrapping reqwest with basic auth.
+/// WebDAV client wrapping reqwest with basic auth. Credentials are zeroized on drop.
 pub struct WebDavClient {
     _client: Client,
     _base_url: String,
-    _username: String,
-    _password: String,
-}
-
-impl Drop for WebDavClient {
-    fn drop(&mut self) {
-        self._password.zeroize();
-        self._username.zeroize();
-    }
+    _username: Zeroizing<String>,
+    _password: Zeroizing<String>,
 }
 
 impl WebDavClient {
-    pub fn new(base_url: &str, username: &str, password: &str) -> Self {
+    /// Create a new WebDAV client. Rejects non-HTTPS URLs to prevent sending credentials in plaintext.
+    pub fn new(base_url: &str, username: &str, password: &str) -> Result<Self> {
+        if !base_url.starts_with("https://") {
+            return Err(Error::WebDav("Refusing non-HTTPS URL: credentials would be sent in plaintext".into()));
+        }
+        Ok(Self::new_unchecked(base_url, username, password))
+    }
+
+    fn new_unchecked(base_url: &str, username: &str, password: &str) -> Self {
         let base_url = base_url.trim_end_matches('/').to_string();
         Self {
-            _client: Client::new(),
+            _client: Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_else(|_| Client::new()),
             _base_url: base_url,
-            _username: username.to_string(),
-            _password: password.to_string(),
+            _username: Zeroizing::new(username.to_string()),
+            _password: Zeroizing::new(password.to_string()),
         }
     }
 
@@ -56,7 +61,7 @@ impl WebDavClient {
     pub async fn test_connection(&self) -> Result<()> {
         let resp = self._client
             .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &self._base_url)
-            .basic_auth(&self._username, Some(&self._password))
+            .basic_auth(self._username.as_str(), Some(self._password.as_str()))
             .header("Depth", "0")
             .header("Content-Type", "application/xml")
             .body(PROPFIND_BODY)
@@ -78,7 +83,7 @@ impl WebDavClient {
         let url = self.full_url(path);
         let resp = self._client
             .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &url)
-            .basic_auth(&self._username, Some(&self._password))
+            .basic_auth(self._username.as_str(), Some(self._password.as_str()))
             .header("Depth", "1")
             .header("Content-Type", "application/xml")
             .body(PROPFIND_BODY)
@@ -99,7 +104,7 @@ impl WebDavClient {
         let url = self.full_url(path);
         let resp = self._client
             .get(&url)
-            .basic_auth(&self._username, Some(&self._password))
+            .basic_auth(self._username.as_str(), Some(self._password.as_str()))
             .send()
             .await?;
 
@@ -119,7 +124,7 @@ impl WebDavClient {
         let url = self.full_url(path);
         let resp = self._client
             .put(&url)
-            .basic_auth(&self._username, Some(&self._password))
+            .basic_auth(self._username.as_str(), Some(self._password.as_str()))
             .body(content)
             .send()
             .await?;
@@ -136,7 +141,7 @@ impl WebDavClient {
         let url = self.full_url(path);
         let resp = self._client
             .delete(&url)
-            .basic_auth(&self._username, Some(&self._password))
+            .basic_auth(self._username.as_str(), Some(self._password.as_str()))
             .send()
             .await?;
 
@@ -155,7 +160,7 @@ impl WebDavClient {
         let url = self.full_url(path);
         let resp = self._client
             .request(reqwest::Method::from_bytes(b"MKCOL").unwrap(), &url)
-            .basic_auth(&self._username, Some(&self._password))
+            .basic_auth(self._username.as_str(), Some(self._password.as_str()))
             .send()
             .await?;
 
@@ -388,19 +393,26 @@ fn extract_relative_path(href: &str, base_url: &str, request_path: &str) -> Stri
 // --- Credential Storage ---
 
 #[cfg(feature = "keyring-storage")]
-/// Store WebDAV credentials in the platform keychain.
+/// Store WebDAV credentials in the platform keychain. Password is scoped by domain+username
+/// to prevent collisions when multiple accounts exist on the same server.
 pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result<()> {
     let service = format!("com.onyx.webdav.{}", domain);
+    let scoped_service = format!("com.onyx.webdav.{}.{}", domain, username);
 
     let user_entry = keyring::Entry::new(&service, "username")
         .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
     user_entry.set_password(username)
         .map_err(|e| Error::Credential(format!("Failed to store username: {}", e)))?;
 
-    let pass_entry = keyring::Entry::new(&service, "password")
+    let pass_entry = keyring::Entry::new(&scoped_service, "password")
         .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
     pass_entry.set_password(password)
         .map_err(|e| Error::Credential(format!("Failed to store password: {}", e)))?;
+
+    // Clean up legacy unscoped password entry if present
+    if let Ok(legacy) = keyring::Entry::new(&service, "password") {
+        let _ = legacy.delete_credential();
+    }
 
     Ok(())
 }
@@ -413,16 +425,28 @@ pub fn store_credentials(_domain: &str, _username: &str, _password: &str) -> Res
 
 #[cfg(feature = "keyring-storage")]
 /// Load WebDAV credentials from the platform keychain, falling back to env vars.
-pub fn load_credentials(domain: &str) -> Result<(String, String)> {
+pub fn load_credentials(domain: &str) -> Result<(Zeroizing<String>, Zeroizing<String>)> {
     let service = format!("com.onyx.webdav.{}", domain);
 
     let user_entry = keyring::Entry::new(&service, "username")
         .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
-    let pass_entry = keyring::Entry::new(&service, "password")
-        .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
 
-    if let (Ok(user), Ok(pass)) = (user_entry.get_password(), pass_entry.get_password()) {
-        return Ok((user, pass));
+    if let Ok(user) = user_entry.get_password() {
+        // Try scoped password key first (domain+username), fall back to legacy unscoped key
+        let scoped_service = format!("com.onyx.webdav.{}.{}", domain, user);
+        let pass = keyring::Entry::new(&scoped_service, "password")
+            .ok()
+            .and_then(|e| e.get_password().ok())
+            .or_else(|| {
+                // Migration fallback: try legacy unscoped password entry
+                keyring::Entry::new(&service, "password")
+                    .ok()
+                    .and_then(|e| e.get_password().ok())
+            });
+
+        if let Some(pass) = pass {
+            return Ok((Zeroizing::new(user), Zeroizing::new(pass)));
+        }
     }
 
     // Fallback to env vars for headless/CI environments
@@ -430,27 +454,29 @@ pub fn load_credentials(domain: &str) -> Result<(String, String)> {
         std::env::var("ONYX_WEBDAV_USER"),
         std::env::var("ONYX_WEBDAV_PASS"),
     ) {
-        return Ok((user, pass));
+        log::warn!("Using environment variables for WebDAV credentials — prefer keyring for better security");
+        return Ok((Zeroizing::new(user), Zeroizing::new(pass)));
     }
 
     Err(Error::Credential(format!(
-        "No credentials found for '{}'. Run 'onyx sync --setup' or set ONYX_WEBDAV_USER and ONYX_WEBDAV_PASS.",
+        "No credentials found for '{}'. Run setup or configure environment variables.",
         domain
     )))
 }
 
 #[cfg(not(feature = "keyring-storage"))]
 /// Load WebDAV credentials from env vars only (keyring not available).
-pub fn load_credentials(domain: &str) -> Result<(String, String)> {
+pub fn load_credentials(domain: &str) -> Result<(Zeroizing<String>, Zeroizing<String>)> {
     if let (Ok(user), Ok(pass)) = (
         std::env::var("ONYX_WEBDAV_USER"),
         std::env::var("ONYX_WEBDAV_PASS"),
     ) {
-        return Ok((user, pass));
+        log::warn!("Using environment variables for WebDAV credentials — these are visible to other processes on this system");
+        return Ok((Zeroizing::new(user), Zeroizing::new(pass)));
     }
 
     Err(Error::Credential(format!(
-        "No credentials found for '{}'. Set ONYX_WEBDAV_USER and ONYX_WEBDAV_PASS.",
+        "No credentials found for '{}'. Configure environment variables.",
         domain
     )))
 }
@@ -460,10 +486,23 @@ pub fn load_credentials(domain: &str) -> Result<(String, String)> {
 pub fn delete_credentials(domain: &str) -> Result<()> {
     let service = format!("com.onyx.webdav.{}", domain);
 
-    if let Ok(entry) = keyring::Entry::new(&service, "username") {
+    // Load username first so we can delete the scoped password entry
+    let username = keyring::Entry::new(&service, "username")
+        .ok()
+        .and_then(|e| e.get_password().ok());
+
+    if let Some(user) = &username {
+        let scoped_service = format!("com.onyx.webdav.{}.{}", domain, user);
+        if let Ok(entry) = keyring::Entry::new(&scoped_service, "password") {
+            let _ = entry.delete_credential();
+        }
+    }
+
+    // Clean up legacy unscoped password and username entries
+    if let Ok(entry) = keyring::Entry::new(&service, "password") {
         let _ = entry.delete_credential();
     }
-    if let Ok(entry) = keyring::Entry::new(&service, "password") {
+    if let Ok(entry) = keyring::Entry::new(&service, "username") {
         let _ = entry.delete_credential();
     }
 
@@ -641,8 +680,20 @@ mod tests {
     // --- WebDavClient URL building ---
 
     #[test]
+    fn test_new_rejects_http() {
+        let result = WebDavClient::new("http://example.com/dav", "user", "pass");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_accepts_https() {
+        let result = WebDavClient::new("https://example.com/dav", "user", "pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn test_full_url_building() {
-        let client = WebDavClient::new("http://example.com/dav/", "user", "pass");
+        let client = WebDavClient::new_unchecked("http://example.com/dav/", "user", "pass");
         assert_eq!(client.full_url(""), "http://example.com/dav");
         assert_eq!(client.full_url("file.md"), "http://example.com/dav/file.md");
         assert_eq!(client.full_url("My Tasks/Buy groceries.md"), "http://example.com/dav/My%20Tasks/Buy%20groceries.md");
@@ -650,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_full_url_strips_leading_slash() {
-        let client = WebDavClient::new("http://example.com/dav", "user", "pass");
+        let client = WebDavClient::new_unchecked("http://example.com/dav", "user", "pass");
         assert_eq!(client.full_url("/file.md"), "http://example.com/dav/file.md");
     }
 
