@@ -3,18 +3,35 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkspaceMode {
+    Local,
+    Webdav,
+}
+
+impl Default for WorkspaceMode {
+    fn default() -> Self {
+        Self::Local
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
     pub path: PathBuf,
+    #[serde(default)]
+    pub mode: WorkspaceMode,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub webdav_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub last_sync: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub theme: Option<String>,
 }
 
 impl WorkspaceConfig {
     pub fn new(path: PathBuf) -> Self {
-        Self { path, webdav_url: None, last_sync: None }
+        Self { path, mode: WorkspaceMode::Local, webdav_url: None, last_sync: None, theme: None }
     }
 }
 
@@ -229,7 +246,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.json");
 
-        // Write old-format JSON without webdav_url or last_sync fields
+        // Write old-format JSON without webdav_url, last_sync, mode, or theme fields
         let old_json = r#"{
             "workspaces": {
                 "personal": { "path": "/home/user/tasks" }
@@ -243,5 +260,7 @@ mod tests {
         assert_eq!(ws.path, PathBuf::from("/home/user/tasks"));
         assert!(ws.webdav_url.is_none());
         assert!(ws.last_sync.is_none());
+        assert_eq!(ws.mode, WorkspaceMode::Local);
+        assert!(ws.theme.is_none());
     }
 }
