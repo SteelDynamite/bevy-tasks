@@ -204,7 +204,7 @@
     if (isDesktop) appWindow.startDragging();
   }
 
-  let workspaceNames = $derived(app.config ? Object.keys(app.config.workspaces) : []);
+  let workspaceNames = $derived(app.config ? Object.keys(app.config.workspaces).sort((a, b) => a.localeCompare(b)) : []);
   let translateX = $derived(showDrawer ? '0' : '-80cqi');
 </script>
 
@@ -244,7 +244,7 @@
               {@const ws = app.config?.workspaces[name]}
               <div class="group flex items-center px-1 hover:bg-black/5 dark:hover:bg-white/10">
                 <button
-                  onclick={() => { app.switchWorkspace(name); showWorkspacePicker = false; }}
+                  onclick={() => { if (name !== app.config?.current_workspace) app.switchWorkspace(name); showWorkspacePicker = false; }}
                   class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left {name === app.config?.current_workspace ? 'font-bold' : ''}"
                 >
                   {#if name === app.config?.current_workspace}
