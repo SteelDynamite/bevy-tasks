@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    onyx_tauri_lib::run()
+    onyx_tasks_lib::run()
 }

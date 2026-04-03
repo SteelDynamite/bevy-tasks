@@ -1,13 +1,17 @@
 [package]
-name = "onyx-tauri"
+name = "onyx-tasks"
 version = "0.1.0"
 edition = "2021"
 description = "Tauri v2 desktop GUI for Onyx"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/SteelDynamite/onyx"
 
+[[bin]]
+name = "onyx-standalone"
+path = "src/main.rs"
+
 [lib]
-name = "onyx_tauri_lib"
+name = "onyx_tasks_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
