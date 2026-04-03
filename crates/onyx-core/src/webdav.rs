@@ -1,6 +1,10 @@
 use reqwest::Client;
 use zeroize::Zeroizing;
+use std::time::Duration;
 use crate::error::{Error, Result};
+
+/// Hard timeout for any WebDAV network operation.
+pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Information about a file on the remote WebDAV server.
 #[derive(Debug, Clone)]
@@ -32,8 +36,8 @@ impl WebDavClient {
         let base_url = base_url.trim_end_matches('/').to_string();
         Self {
             _client: Client::builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .connect_timeout(std::time::Duration::from_secs(10))
+                .timeout(Duration::from_secs(30))
+                .connect_timeout(Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
             _base_url: base_url,

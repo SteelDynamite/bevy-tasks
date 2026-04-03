@@ -99,13 +99,6 @@ fn repo_mut(state: &mut AppState) -> Result<&mut TaskRepository, String> {
     state.repo.as_mut().ok_or_else(|| "Repository not initialized".to_string())
 }
 
-// ── Debug ───────────────────────────────────────────────────────────
-
-#[tauri::command]
-fn log_debug(msg: String) {
-    eprintln!("[frontend] {msg}");
-}
-
 // ── Config commands ──────────────────────────────────────────────────
 
 #[tauri::command]
@@ -473,19 +466,27 @@ fn add_webdav_workspace(
 }
 
 #[tauri::command]
-fn store_credentials(
+async fn store_credentials(
     domain: String,
     username: String,
     password: String,
 ) -> Result<(), String> {
-    webdav::store_credentials(&domain, &username, &password).map_err(|e| e.to_string())
+    tokio::task::spawn_blocking(move || {
+        webdav::store_credentials(&domain, &username, &password).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn load_credentials(domain: String) -> Result<(String, String), String> {
-    webdav::load_credentials(&domain)
-        .map(|(u, p)| ((*u).clone(), (*p).clone()))
-        .map_err(|e| e.to_string())
+async fn load_credentials(domain: String) -> Result<(String, String), String> {
+    tokio::task::spawn_blocking(move || {
+        webdav::load_credentials(&domain)
+            .map(|(u, p)| ((*u).clone(), (*p).clone()))
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -505,21 +506,39 @@ async fn test_webdav_connection(
 #[tauri::command]
 async fn sync_workspace(
     workspace_name: String,
-    workspace_path: String,
-    webdav_url: String,
-    username: String,
-    password: String,
     mode: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<SyncResult, String> {
+    // Step 1: read config
+    let (workspace_path, webdav_url) = {
+        let s = lock_state(&state)?;
+        let ws = s.config.workspaces.get(&workspace_name)
+            .ok_or("Workspace not found")?;
+        (ws.path.clone(), ws.webdav_url.clone().ok_or("No WebDAV URL configured")?)
+    };
+
+    // Step 2: load credentials
+    let domain = webdav_url
+        .split("://")
+        .nth(1)
+        .and_then(|rest| rest.split('/').next())
+        .unwrap_or("")
+        .to_string();
+    let (username, password) = tokio::task::spawn_blocking(move || {
+        webdav::load_credentials(&domain)
+            .map(|(u, p)| ((*u).clone(), (*p).clone()))
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
     let sync_mode = match mode.as_str() {
         "push" => SyncMode::Push,
         "pull" => SyncMode::Pull,
         _ => SyncMode::Full,
     };
-    eprintln!("[sync] starting sync: workspace={workspace_name} path={workspace_path} url={webdav_url} mode={mode}");
     let result = sync::sync_workspace(
-        &PathBuf::from(&workspace_path),
+        &workspace_path,
         &webdav_url,
         &username,
         &password,
@@ -527,22 +546,14 @@ async fn sync_workspace(
         None,
     )
     .await
-    .map_err(|e| {
-        eprintln!("[sync] sync_workspace error: {e}");
-        e.to_string()
-    })?;
-    eprintln!("[sync] sync complete: uploaded={} downloaded={} errors={}", result.uploaded, result.downloaded, result.errors.len());
+    .map_err(|e| e.to_string())?;
 
-    // Persist last_sync timestamp to config
     {
-        eprintln!("[sync] acquiring state lock...");
         let mut s = lock_state(&state)?;
-        eprintln!("[sync] lock acquired, saving config...");
         if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
             ws.last_sync = Some(Utc::now());
         }
         s.config.save_to_file(&s.config_path.clone()).map_err(|e| e.to_string())?;
-        eprintln!("[sync] config saved");
     }
 
     Ok(result.into())
@@ -632,7 +643,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            log_debug,
             get_config,
             save_config,
             add_workspace,
