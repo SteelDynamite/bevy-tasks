@@ -74,7 +74,8 @@ onyx/
 │       │   └── lib/
 │       │       ├── screens/            # Full-page views
 │       │       ├── components/         # Reusable UI components
-│       │       └── stores/             # Svelte state (app.svelte.ts)
+│       │       ├── stores/             # Svelte state (app.svelte.ts)
+│       │       └── types.ts           # TypeScript type definitions
 │       └── src-tauri/                  # Rust backend (Tauri commands)
 │           ├── Cargo.toml
 │           ├── tauri.conf.json

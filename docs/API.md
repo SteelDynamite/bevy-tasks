@@ -19,6 +19,7 @@ pub struct Task {
     pub description: String,
     pub status: TaskStatus,
     pub due_date: Option<DateTime<Utc>>,
+    pub has_time: bool,            // Whether due_date includes a specific time
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub parent_id: Option<Uuid>,
@@ -106,6 +107,8 @@ Configuration for a single workspace.
 ```rust
 pub struct WorkspaceConfig {
     pub path: PathBuf,
+    pub webdav_url: Option<String>,
+    pub last_sync: Option<DateTime<Utc>>,
 }
 ```
 
@@ -374,6 +377,9 @@ pub enum Error {
     WorkspaceNotFound(String),
     ListNotFound(String),
     TaskNotFound(String),
+    WebDav(String),
+    Sync(String),
+    Credential(String),
 }
 ```
 

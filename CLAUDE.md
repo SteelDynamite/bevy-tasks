@@ -57,7 +57,7 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - **Main panel header**: Hamburger + window controls in top bar; list name (large, bold) + kebab below divider (matching task detail layout). Kebab has Rename, Group by due date, Delete completed, Delete list.
 - **New task**: FAB button opens bottom toast sheet (outside sliding container for fixed positioning).
 
-### Current state (2026-04-01)
+### Current state (2026-04-03)
 
 - **Phase 1** (Core + CLI): Complete
 - **Phase 2** (WebDAV sync): Backend done, CLI done, GUI wired (settings auto-populates credentials)
@@ -86,7 +86,7 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 - Setup screen with window dragging + "Open Existing Folder" option
 - Sync status indicators (last-sync time + upload/download counts chip)
 - Push/pull/full sync mode selection (session-only, in settings)
-- Desktop packaging (Linux: AppImage + .deb)
+- Desktop packaging (Linux: AppImage + .deb; Windows: MSI)
 - Tauri desktop-only deps (notify, keyring) feature-gated for Android compilation
 - Subtask hierarchy: subtask count shown on parent tasks in list, subtask detail via three-panel slide navigation, inline add at top of subtask list (new subtasks prepend), collapsible completed subtasks section, cascade delete (parent deletion removes all subtasks with confirmation warning)
 - Custom confirmation dialogs (ConfirmDialog component replaces native confirm())
@@ -95,7 +95,7 @@ The GUI uses Svelte 5 runes mode (`$state`, `$derived`, `$effect`, `$props()`). 
 
 - Workspace retarget/migrate
 - Search/filter tasks
-- Desktop packaging for Windows and macOS
+- Desktop packaging for macOS
 
 ## Roadmap
 
