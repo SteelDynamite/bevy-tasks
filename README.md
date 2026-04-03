@@ -27,8 +27,9 @@ onyx/
 ## Project Status
 
 - **Phase 1** (Core + CLI): Complete
-- **Phase 2** (WebDAV Sync): Backend and CLI complete, GUI partially wired
-- **Phase 3** (GUI MVP): In progress — core task CRUD working, UI polished
+- **Phase 2** (WebDAV Sync): Complete — backend, CLI, and GUI all wired
+- **Phase 3** (GUI MVP): Complete
+- **Phase 4** (Mobile): Tauri Android cfg-gated, needs `tauri android init` + build
 
 ### Core Library (`onyx-core`)
 - Data models (Task, TaskList, AppConfig, WorkspaceConfig)
@@ -36,8 +37,9 @@ onyx/
 - Local storage with repository pattern
 - Multiple workspace support
 - Task ordering and grouping
+- Subtask hierarchy (parent_id)
 - WebDAV sync with three-way diff and offline queue
-- Platform keychain credential storage
+- Platform keychain credential storage (feature-gated for Android)
 
 ### CLI (`onyx-cli`)
 - Workspace management (init, add, list, switch, remove, retarget, migrate)
@@ -52,7 +54,17 @@ onyx/
 - Drag-and-drop reordering
 - Sliding lists drawer, settings popup
 - Workspace switcher with add/remove
-- Dark mode
+- Dark mode (GNOME-style neutral grays, cyan-blue accent)
+- Due date picker/editor with optional time
+- Subtask hierarchy with three-panel slide navigation
+- Move tasks between lists
+- List rename, group-by-due-date toggle, delete completed tasks
+- Keyboard shortcuts (Escape priority chain)
+- WebDAV setup flow with credential auto-population
+- File watcher (auto-reloads on external changes)
+- Sync status indicators and push/pull/full mode selection
+- Custom confirmation dialogs
+- Desktop packaging (Linux: AppImage + .deb; Windows: MSI)
 
 ## Development Setup
 
@@ -199,7 +211,7 @@ cargo test -- --nocapture
 ## What's Next?
 
 - **Phase 4**: Mobile support (iOS & Android via Tauri v2 mobile)
-- **Phase 5**: GUI advanced features (subtasks, search, date picker)
+- **Phase 5**: GUI advanced features (rich markdown editor, search/filter)
 - **Phase 6**: Mobile polish and platform-specific integrations
 - **Phase 7**: Google Tasks importer and unique features
 

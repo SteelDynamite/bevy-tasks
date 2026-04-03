@@ -508,15 +508,15 @@ keyring = "3.0"
 
 ### Features
 
-- [ ] WebDAV client implementation in core library
-- [ ] Credential storage (platform keychain)
-- [ ] Bi-directional sync (push/pull)
-- [ ] Conflict resolution (last-write-wins)
-- [ ] Offline queue for pending operations
-- [ ] CLI: `sync --setup` command
-- [ ] CLI: `sync --push` command
-- [ ] CLI: `sync --pull` command
-- [ ] CLI: `sync --status` command
+- [x] WebDAV client implementation in core library
+- [x] Credential storage (platform keychain)
+- [x] Bi-directional sync (push/pull)
+- [x] Conflict resolution (last-write-wins)
+- [x] Offline queue for pending operations
+- [x] CLI: `sync --setup` command
+- [x] CLI: `sync --push` command
+- [x] CLI: `sync --pull` command
+- [x] CLI: `sync --status` command
 - [ ] Progress indicators for sync operations
 
 ### CLI Usage Examples
@@ -590,9 +590,9 @@ Workspace: shared
 
 ### Deliverables
 
-- [ ] Working WebDAV sync in backend
-- [ ] CLI can sync with remote WebDAV server
-- [ ] Reliable conflict resolution
+- [x] Working WebDAV sync in backend
+- [x] CLI can sync with remote WebDAV server
+- [x] Reliable conflict resolution
 - [ ] Tested with Nextcloud, ownCloud
 
 ---
@@ -726,12 +726,12 @@ WorkspaceConfig {
 - [x] Group-by-due-date toggle per list (checkmark toggle in list kebab menu)
 - [x] Subtask hierarchy (expand/collapse, inline add, cascade toggle/delete)
 - [ ] Search/filter tasks
-- [x] Desktop packaging (Linux: AppImage + .deb; Windows/macOS not yet verified)
+- [x] Desktop packaging (Linux: AppImage + .deb; Windows: MSI; macOS not yet verified)
 - [x] File watcher (notify crate, 500ms debounce, auto-reloads UI on external file changes)
 
 ### Deliverables
 
-- [x] Functional desktop GUI app (Linux verified, Wayland native)
+- [x] Functional desktop GUI app (Linux verified, Windows MSI packaging added)
 - [ ] Sub-300ms startup time (not yet measured/optimized)
 - [x] Clean, minimal UI
 - [ ] Feature parity with CLI
@@ -803,15 +803,15 @@ npm run tauri ios build
 
 #### Features
 
-- [ ] Gate file-watcher initialization behind `#[cfg(not(mobile))]`
-- [ ] Install Android Studio + NDK, configure env vars
-- [ ] Add Android Rust targets
-- [ ] `npm run tauri android init` (generates `gen/android/`)
-- [ ] Confirm `npm run tauri android build` succeeds
+- [x] Gate file-watcher initialization behind `#[cfg(not(mobile))]`
+- [x] Install Android Studio + NDK, configure env vars
+- [x] Add Android Rust targets
+- [x] `npm run tauri android init` (generates `gen/android/`)
+- [x] Confirm `npm run tauri android build` succeeds
+- [ ] Basic smoke test: app launches, workspace setup, create a task
 - [ ] Set up macOS CI for iOS builds
 - [ ] `npm run tauri ios init` (generates `gen/ios/`)
 - [ ] Confirm `npm run tauri ios build` succeeds on CI
-- [ ] Basic smoke test: app launches, workspace setup, create a task
 
 ---
 
@@ -1011,6 +1011,6 @@ This project is free and open-source software licensed under GPL v3.
 
 ---
 
-**Last Updated**: 2026-04-01
-**Document Version**: 4.1
+**Last Updated**: 2026-04-03
+**Document Version**: 4.2
 **Status**: Ready to Implement - Milestone-Driven Plan
