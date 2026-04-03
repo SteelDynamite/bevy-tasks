@@ -990,6 +990,7 @@ dependencies = [
  "chrono",
  "directories",
  "keyring",
+ "log",
  "quick-xml",
  "reqwest",
  "serde",
