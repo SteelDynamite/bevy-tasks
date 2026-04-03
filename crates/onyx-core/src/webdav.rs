@@ -99,7 +99,16 @@ impl WebDavClient {
             return Err(Error::WebDav(format!("PROPFIND failed with status {}", status)));
         }
 
-        let body = resp.text().await?;
+        // Reject oversized responses to prevent memory exhaustion from malicious servers
+        const MAX_PROPFIND_BYTES: u64 = 10 * 1024 * 1024;
+        if resp.content_length().unwrap_or(0) > MAX_PROPFIND_BYTES {
+            return Err(Error::WebDav("PROPFIND response too large (>10MB)".into()));
+        }
+        let bytes = resp.bytes().await?;
+        if bytes.len() as u64 > MAX_PROPFIND_BYTES {
+            return Err(Error::WebDav("PROPFIND response too large (>10MB)".into()));
+        }
+        let body = String::from_utf8_lossy(&bytes);
         parse_propfind_response(&body, &self._base_url, path)
     }
 
@@ -401,7 +410,7 @@ fn extract_relative_path(href: &str, base_url: &str, request_path: &str) -> Stri
 /// to prevent collisions when multiple accounts exist on the same server.
 pub fn store_credentials(domain: &str, username: &str, password: &str) -> Result<()> {
     let service = format!("com.onyx.webdav.{}", domain);
-    let scoped_service = format!("com.onyx.webdav.{}.{}", domain, username);
+    let scoped_service = format!("com.onyx.webdav.{}::{}", domain, username);
 
     let user_entry = keyring::Entry::new(&service, "username")
         .map_err(|e| Error::Credential(format!("Failed to create keyring entry: {}", e)))?;
@@ -437,18 +446,29 @@ pub fn load_credentials(domain: &str) -> Result<(Zeroizing<String>, Zeroizing<St
 
     if let Ok(user) = user_entry.get_password() {
         // Try scoped password key first (domain+username), fall back to legacy unscoped key
-        let scoped_service = format!("com.onyx.webdav.{}.{}", domain, user);
-        let pass = keyring::Entry::new(&scoped_service, "password")
+        let scoped_service = format!("com.onyx.webdav.{}::{}", domain, user);
+        let found = keyring::Entry::new(&scoped_service, "password")
             .ok()
             .and_then(|e| e.get_password().ok())
+            .map(|p| (p, false))
             .or_else(|| {
                 // Migration fallback: try legacy unscoped password entry
                 keyring::Entry::new(&service, "password")
                     .ok()
                     .and_then(|e| e.get_password().ok())
+                    .map(|p| (p, true))
             });
 
-        if let Some(pass) = pass {
+        if let Some((pass, needs_migration)) = found {
+            // Auto-migrate legacy credentials to scoped format
+            if needs_migration {
+                if let Ok(entry) = keyring::Entry::new(&scoped_service, "password") {
+                    let _ = entry.set_password(&pass);
+                }
+                if let Ok(legacy) = keyring::Entry::new(&service, "password") {
+                    let _ = legacy.delete_credential();
+                }
+            }
             return Ok((Zeroizing::new(user), Zeroizing::new(pass)));
         }
     }
@@ -496,7 +516,7 @@ pub fn delete_credentials(domain: &str) -> Result<()> {
         .and_then(|e| e.get_password().ok());
 
     if let Some(user) = &username {
-        let scoped_service = format!("com.onyx.webdav.{}.{}", domain, user);
+        let scoped_service = format!("com.onyx.webdav.{}::{}", domain, user);
         if let Ok(entry) = keyring::Entry::new(&scoped_service, "password") {
             let _ = entry.delete_credential();
         }
