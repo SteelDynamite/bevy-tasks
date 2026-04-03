@@ -318,6 +318,8 @@ let status = get_sync_status(Path::new("/home/user/tasks"))?;
 
 Credentials are stored in the platform keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service).
 
+Keyring service keys use the format `com.onyx.webdav.<domain>::<username>` — the `::` separator prevents key collisions when usernames contain dots. On first load, credentials stored in the legacy `.`-separated format (`com.onyx.webdav.<domain>.<username>`) are automatically migrated to the scoped format and the old entries are removed.
+
 ```rust
 use onyx_core::webdav::{store_credentials, load_credentials, delete_credentials};
 
@@ -363,6 +365,7 @@ client.delete_file("old-task.md").await?;
 - **Conflict resolution**: Last-write-wins using file timestamps
 - **Offline queue**: Pending operations are queued and replayed when connectivity returns
 - **Sync state**: Stored in `.syncstate.json` within the workspace directory
+- **Response size cap**: PROPFIND responses are limited to 10 MB (checked via `Content-Length` header and actual body size) to prevent memory exhaustion from malicious servers
 
 ## Error Handling
 
