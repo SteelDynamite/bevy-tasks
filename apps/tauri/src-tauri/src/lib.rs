@@ -11,7 +11,7 @@ use tauri::{Emitter, Manager, State};
 use uuid::Uuid;
 
 use onyx_core::{
-    config::{AppConfig, WorkspaceConfig},
+    config::{AppConfig, WorkspaceConfig, WorkspaceMode},
     models::{Task, TaskList, TaskStatus},
     repository::TaskRepository,
     sync::{self, SyncMode, SyncResult as CoreSyncResult},
@@ -31,6 +31,7 @@ static LAST_WRITE: Mutex<Option<Instant>> = Mutex::new(None);
 struct AppState {
     config: AppConfig,
     config_path: PathBuf,
+    app_data_dir: PathBuf,
     repo: Option<TaskRepository>,
 }
 
@@ -418,6 +419,53 @@ fn set_webdav_config(
 }
 
 #[tauri::command]
+fn set_workspace_theme(
+    workspace_name: String,
+    theme: Option<String>,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), String> {
+    let mut s = lock_state(&state)?;
+    if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
+        ws.theme = theme;
+    }
+    s.config.save_to_file(&s.config_path.clone()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn add_webdav_workspace(
+    name: String,
+    webdav_url: String,
+    username: String,
+    password: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), String> {
+    let mut s = lock_state(&state)?;
+    let managed_dir = s.app_data_dir.join("workspaces").join(&name);
+    std::fs::create_dir_all(&managed_dir).map_err(|e| e.to_string())?;
+    TaskRepository::init(managed_dir.clone()).map(|_| ()).map_err(|e| e.to_string())?;
+
+    let mut ws = WorkspaceConfig::new(managed_dir);
+    ws.mode = WorkspaceMode::Webdav;
+    ws.webdav_url = Some(webdav_url.clone());
+
+    s.config.add_workspace(name.clone(), ws);
+    s.config.set_current_workspace(name).map_err(|e| e.to_string())?;
+    s.repo = None;
+
+    // Store credentials keyed by hostname
+    let domain = webdav_url
+        .split("://")
+        .nth(1)
+        .and_then(|rest| rest.split('/').next())
+        .unwrap_or("")
+        .to_string();
+    s.config.save_to_file(&s.config_path.clone()).map_err(|e| e.to_string())?;
+    drop(s);
+    webdav::store_credentials(&domain, &username, &password).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn store_credentials(
     domain: String,
     username: String,
@@ -545,23 +593,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
         .setup(|app| {
-            // Resolve config path: Tauri's app_data_dir on Android, directories crate on desktop
+            // Resolve app data dir and config path
+            let app_data_dir = app.path().app_data_dir()
+                .map_err(|e| format!("Failed to get app data dir: {}", e))?;
             let config_path = {
                 #[cfg(target_os = "android")]
-                {
-                    use tauri::Manager;
-                    app.path().app_data_dir()
-                        .map_err(|e| format!("Failed to get app data dir: {}", e))?
-                        .join("config.json")
-                }
+                { app_data_dir.join("config.json") }
                 #[cfg(not(target_os = "android"))]
-                {
-                    AppConfig::get_config_path()
-                }
+                { AppConfig::get_config_path() }
             };
             let config = AppConfig::load_from_file(&config_path).unwrap_or_default();
             let workspace_path = config.get_current_workspace().ok().map(|(_, ws)| ws.path.clone());
-            app.manage(Mutex::new(AppState { config, config_path, repo: None }));
+            app.manage(Mutex::new(AppState { config, config_path, app_data_dir, repo: None }));
 
             #[cfg(not(target_os = "android"))]
             if let Some(path) = workspace_path {
@@ -591,6 +634,8 @@ pub fn run() {
             set_group_by_due_date,
             get_group_by_due_date,
             set_webdav_config,
+            set_workspace_theme,
+            add_webdav_workspace,
             store_credentials,
             load_credentials,
             test_webdav_connection,
