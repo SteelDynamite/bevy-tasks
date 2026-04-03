@@ -510,7 +510,7 @@ pub async fn sync_workspace(
     mode: SyncMode,
     on_progress: Option<ProgressCallback>,
 ) -> Result<SyncResult> {
-    let client = WebDavClient::new(webdav_url, username, password);
+    let client = WebDavClient::new(webdav_url, username, password)?;
     let mut sync_state = SyncState::load(workspace_path);
     let queue = OfflineQueue::load(workspace_path);
     let mut result = SyncResult::default();

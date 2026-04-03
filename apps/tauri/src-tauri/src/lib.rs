@@ -99,6 +99,13 @@ fn repo_mut(state: &mut AppState) -> Result<&mut TaskRepository, String> {
     state.repo.as_mut().ok_or_else(|| "Repository not initialized".to_string())
 }
 
+// ── Debug ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn log_debug(msg: String) {
+    eprintln!("[frontend] {msg}");
+}
+
 // ── Config commands ──────────────────────────────────────────────────
 
 #[tauri::command]
@@ -476,7 +483,9 @@ fn store_credentials(
 
 #[tauri::command]
 fn load_credentials(domain: String) -> Result<(String, String), String> {
-    webdav::load_credentials(&domain).map_err(|e| e.to_string())
+    webdav::load_credentials(&domain)
+        .map(|(u, p)| ((*u).clone(), (*p).clone()))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -485,7 +494,8 @@ async fn test_webdav_connection(
     username: String,
     password: String,
 ) -> Result<(), String> {
-    let client = onyx_core::webdav::WebDavClient::new(&url, &username, &password);
+    let client = onyx_core::webdav::WebDavClient::new(&url, &username, &password)
+        .map_err(|e| e.to_string())?;
     client
         .test_connection()
         .await
@@ -507,6 +517,7 @@ async fn sync_workspace(
         "pull" => SyncMode::Pull,
         _ => SyncMode::Full,
     };
+    eprintln!("[sync] starting sync: workspace={workspace_name} path={workspace_path} url={webdav_url} mode={mode}");
     let result = sync::sync_workspace(
         &PathBuf::from(&workspace_path),
         &webdav_url,
@@ -516,15 +527,22 @@ async fn sync_workspace(
         None,
     )
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| {
+        eprintln!("[sync] sync_workspace error: {e}");
+        e.to_string()
+    })?;
+    eprintln!("[sync] sync complete: uploaded={} downloaded={} errors={}", result.uploaded, result.downloaded, result.errors.len());
 
     // Persist last_sync timestamp to config
     {
+        eprintln!("[sync] acquiring state lock...");
         let mut s = lock_state(&state)?;
+        eprintln!("[sync] lock acquired, saving config...");
         if let Some(ws) = s.config.workspaces.get_mut(&workspace_name) {
             ws.last_sync = Some(Utc::now());
         }
         s.config.save_to_file(&s.config_path.clone()).map_err(|e| e.to_string())?;
+        eprintln!("[sync] config saved");
     }
 
     Ok(result.into())
@@ -614,6 +632,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            log_debug,
             get_config,
             save_config,
             add_workspace,
