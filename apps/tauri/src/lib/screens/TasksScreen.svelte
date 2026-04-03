@@ -35,6 +35,7 @@
 
   let showDrawer = $state(false);
   let showSettings = $state(false);
+  let settingsWorkspace = $state<string | null>(null);
   let showNewList = $state(false);
   let showWorkspacePicker = $state(false);
   let workspacePickerEl = $state<HTMLDivElement | null>(null);
@@ -152,7 +153,7 @@
         clone.style.position = "absolute";
         clone.style.top = "-9999px";
         clone.style.left = "-9999px";
-        if (app.darkMode) {
+        if (app.isDark) {
           clone.classList.add("dark");
           clone.style.backgroundColor = "var(--color-surface-dark)";
           clone.style.color = "var(--color-text-dark)";
@@ -192,12 +193,9 @@
     showNewList = false;
   }
 
-  function openSettings() {
-    showSettings = true;
-  }
-
   function closeSettings() {
     showSettings = false;
+    settingsWorkspace = null;
   }
 
   function handleHeaderMouseDown(e: MouseEvent) {
@@ -256,7 +254,7 @@
                   {/if}
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm">{name}</p>
-                    <p class="truncate text-xs opacity-40">{ws?.path ?? ""}</p>
+                    <p class="truncate text-xs opacity-40">{ws?.mode === "webdav" ? ws.webdav_url ?? "WebDAV" : ws?.path ?? ""}</p>
                   </div>
                 </button>
                 <div class="relative shrink-0" data-ws-menu>
@@ -270,6 +268,15 @@
                   </button>
                   {#if wsMenuName === name}
                     <div class="absolute right-0 top-full z-40 mt-1 min-w-[140px] rounded-lg border border-border-light bg-surface-light py-1 shadow-lg dark:border-border-dark dark:bg-surface-dark">
+                      <button
+                        onclick={() => { wsMenuName = null; settingsWorkspace = name; showSettings = true; showWorkspacePicker = false; }}
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                      >
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                        </svg>
+                        Settings
+                      </button>
                       <button
                         onclick={() => { wsMenuName = null; confirmRemoveWorkspace = name; }}
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-black/5 dark:hover:bg-white/10"
@@ -347,20 +354,6 @@
       </div>
     </div>
 
-    <!-- Settings -->
-    <button
-      onclick={openSettings}
-      class="flex shrink-0 items-center gap-2 border-t border-border-light px-5 py-3 text-sm opacity-50 hover:bg-black/5 hover:opacity-80 dark:border-border-dark dark:hover:bg-white/10"
-    >
-      <svg class="h-4.5 w-4.5" viewBox="0 0 20 20" fill="currentColor">
-        <path
-          fill-rule="evenodd"
-          d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-          clip-rule="evenodd"
-        />
-      </svg>
-      Settings
-    </button>
   </div>
 
   <!-- Main content panel -->
@@ -632,7 +625,7 @@
     class="relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-surface-light transition-transform duration-200 dark:bg-surface-dark {showSettings ? 'scale-100' : 'scale-95'}"
     style="border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 60px rgba(0,0,0,0.7), 0 10px 20px rgba(0,0,0,0.5)"
   >
-    <SettingsScreen onclose={closeSettings} />
+    <SettingsScreen onclose={closeSettings} workspaceName={settingsWorkspace ?? app.config?.current_workspace ?? ""} />
   </div>
 </div>
 
